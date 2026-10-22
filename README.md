@@ -6,6 +6,19 @@
 
 ![status](https://img.shields.io/badge/build-vite5-blue) ![stack](https://img.shields.io/badge/stack-React18%20%2B%20TS%20%2B%20Canvas-0b7285) ![license](https://img.shields.io/badge/license-MIT-green)
 
+**在线试用**：<https://watermark-studio.edgeone.cool> · **代码**：<https://github.com/cccgitzh/watermark-studio>
+
+![编辑器界面](docs/screenshots/editor-light.png)
+
+<details>
+<summary>更多截图（标签条样式 / 深色主题 / 移动端）</summary>
+
+| 标签条 + 描边 | 深色主题 | 移动端 390px |
+| --- | --- | --- |
+| ![](docs/screenshots/label-chip.png) | ![](docs/screenshots/editor-dark.png) | ![](docs/screenshots/mobile.png) |
+
+</details>
+
 ---
 
 ## 为什么重写
@@ -69,7 +82,7 @@
 ## 快速开始
 
 ```bash
-git clone https://github.com/<your-name>/watermark-studio.git
+git clone https://github.com/cccgitzh/watermark-studio.git
 cd watermark-studio
 npm install
 npm run dev        # http://localhost:5173
