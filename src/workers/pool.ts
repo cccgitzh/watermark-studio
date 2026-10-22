@@ -1,6 +1,6 @@
 import { encodeCanvas } from '../core/export';
 import { renderComposite } from '../core/renderer';
-import type { WatermarkLayer } from '../core/types';
+import type { TextVars, WatermarkLayer } from '../core/types';
 import type { WorkerRenderJob, WorkerRequest, WorkerResponse } from './render.worker';
 
 export interface RenderJobInput {
@@ -9,6 +9,7 @@ export interface RenderJobInput {
   height: number;
   layers: WatermarkLayer[];
   logos: Record<string, ImageBitmap>;
+  vars?: TextVars;
   mime: string;
   quality: number;
   flattenColor: string;
@@ -31,11 +32,15 @@ interface Pending {
 interface WorkerSlot {
   worker: Worker;
   busy: boolean;
+  currentId: string | null;
 }
 
 /**
  * 渲染池：优先用 OffscreenCanvas + Web Worker，避免批量处理时主线程卡死。
- * 不支持 OffscreenCanvas 或自定义字体等场景自动回退到主线程渲染。
+ * 不支持 OffscreenCanvas 时自动回退主线程渲染。
+ *
+ * 容错：单个 Worker 崩溃只判该槽位当前任务失败，随后重建线程继续跑队列，
+ * 不会让后续任务挂死。
  */
 export class RenderPool {
   private slots: WorkerSlot[] = [];
@@ -53,23 +58,32 @@ export class RenderPool {
     this.mode = supported ? 'worker' : 'main';
     this.size = Math.max(1, Math.min(4, size));
     if (this.mode === 'worker') {
-      for (let i = 0; i < this.size; i += 1) this.slots.push(this.spawn());
+      for (let i = 0; i < this.size; i += 1) {
+        const slot: WorkerSlot = { worker: this.createWorker(), busy: false, currentId: null };
+        this.attach(slot);
+        this.slots.push(slot);
+      }
     }
   }
 
-  private spawn(): WorkerSlot {
-    const worker = new Worker(new URL('./render.worker.ts', import.meta.url), {
+  private createWorker(): Worker {
+    return new Worker(new URL('./render.worker.ts', import.meta.url), {
       type: 'module',
       name: 'watermark-renderer',
     });
-    const slot: WorkerSlot = { worker, busy: false };
+  }
 
-    worker.onmessage = (event: MessageEvent<WorkerResponse>) => {
+  private attach(slot: WorkerSlot): void {
+    slot.worker.onmessage = (event: MessageEvent<WorkerResponse>) => {
       const data = event.data;
-      if (!data) return;
+      slot.busy = false;
+      slot.currentId = null;
+      if (!data) {
+        this.pump();
+        return;
+      }
       const entry = this.pending.get(data.id);
       this.pending.delete(data.id);
-      slot.busy = false;
       if (data.type === 'done') {
         entry?.resolve({ blob: data.blob, width: data.width, height: data.height });
       } else {
@@ -78,17 +92,24 @@ export class RenderPool {
       this.pump();
     };
 
-    worker.onerror = (event) => {
+    slot.worker.onerror = (event) => {
+      const failedId = slot.currentId;
       const message = event.message || '渲染线程异常';
-      for (const [id, entry] of this.pending) {
-        entry.reject(new Error(message));
-        this.pending.delete(id);
-      }
       slot.busy = false;
-      this.pump();
+      slot.currentId = null;
+      if (failedId) {
+        const entry = this.pending.get(failedId);
+        this.pending.delete(failedId);
+        entry?.reject(new Error(message));
+      }
+      if (!this.destroyed) {
+        // 线程可能已损坏，换一个继续处理排队任务
+        slot.worker.terminate();
+        slot.worker = this.createWorker();
+        this.attach(slot);
+        this.pump();
+      }
     };
-
-    return slot;
   }
 
   render(input: RenderJobInput): Promise<RenderOutput> {
@@ -105,12 +126,13 @@ export class RenderPool {
   }
 
   private pump(): void {
-    if (this.mode !== 'worker') return;
+    if (this.mode !== 'worker' || this.destroyed) return;
     for (const slot of this.slots) {
       if (slot.busy) continue;
       const next = this.queue.shift();
       if (!next) return;
       slot.busy = true;
+      slot.currentId = next.id;
       const request: WorkerRequest = { type: 'render', job: next.job };
       slot.worker.postMessage(request);
     }
@@ -144,6 +166,7 @@ export async function renderOnMainThread(input: RenderJobInput): Promise<RenderO
     height: input.height,
     layers: input.layers,
     logos: input.logos,
+    vars: input.vars,
   });
 
   const blob = await encodeCanvas(canvas, input.mime, input.quality);

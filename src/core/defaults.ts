@@ -5,6 +5,7 @@ import type {
   ImageLayer,
   LayoutConfig,
   Preset,
+  RedactLayer,
   TextLayer,
   WatermarkLayer,
 } from './types';
@@ -113,6 +114,25 @@ export const createImageLayer = (src: string, patch: Partial<ImageLayer> = {}): 
   ...patch,
 });
 
+export const createRedactLayer = (patch: Partial<RedactLayer> = {}): RedactLayer => ({
+  id: uid('rdt'),
+  type: 'redact',
+  name: '打码区域',
+  visible: true,
+  opacity: 1,
+  rotation: 0,
+  blend: 'source-over',
+  mode: 'mosaic',
+  regions: [
+    { id: uid('rg'), x: 0.3, y: 0.4, w: 0.36, h: 0.08 },
+  ],
+  blockSize: 0.018,
+  blurRadius: 0.02,
+  color: '#111111',
+  radius: 0.004,
+  ...patch,
+});
+
 export const defaultExportSettings: ExportSettings = {
   format: 'original',
   quality: 0.92,
@@ -145,6 +165,22 @@ const presetSeeds: PresetSeed[] = [
         fontWeight: 600,
         letterSpacing: 0.08,
         layout: { mode: 'tile', gapX: 1.1, gapY: 2.2, stagger: false, padding: 0.05 },
+      }),
+    ],
+  },
+  {
+    id: 'preset-redact',
+    name: '证件号打码（马赛克）',
+    layers: [
+      createRedactLayer({
+        name: '证件号打码',
+        mode: 'mosaic',
+        blockSize: 0.016,
+        radius: 0.004,
+        regions: [
+          { id: uid('rg'), x: 0.28, y: 0.335, w: 0.34, h: 0.055 },
+          { id: uid('rg'), x: 0.28, y: 0.485, w: 0.26, h: 0.05 },
+        ],
       }),
     ],
   },

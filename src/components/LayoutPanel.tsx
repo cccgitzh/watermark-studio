@@ -18,6 +18,36 @@ export function LayoutPanel({ layer }: { layer: WatermarkLayer | null }) {
     );
   }
 
+  if (layer.type === 'redact') {
+    return (
+      <>
+        <PanelSection title="打码区域">
+          <Hint>
+            打码是按「区域」定位的，不参与单点 / 平铺 / 网格排版。在画布上拖动即可框选，区域列表与打码方式在「样式」页签里调整。
+          </Hint>
+          <Field label={`当前 ${layer.regions.length} 个区域`}>
+            <div className="button-row">
+              <button
+                type="button"
+                className="button button-sm"
+                onClick={() => moveLayer(layer.id, -1)}
+              >
+                上移一层
+              </button>
+              <button
+                type="button"
+                className="button button-sm"
+                onClick={() => moveLayer(layer.id, 1)}
+              >
+                下移一层
+              </button>
+            </div>
+          </Field>
+        </PanelSection>
+      </>
+    );
+  }
+
   const layout = layer.layout;
 
   const changeMode = (mode: 'single' | 'tile' | 'grid') => {

@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { useEditor, type ImageItem } from '../state/editorStore';
-import { IconArrowLeft, IconArrowRight, IconTrash } from './icons';
+import { IconArrowLeft, IconArrowRight, IconPlus, IconTrash } from './icons';
 
 function Thumb({ item }: { item: ImageItem }) {
   const ref = useRef<HTMLCanvasElement | null>(null);
@@ -29,6 +29,8 @@ export function Filmstrip() {
   const removeImage = useEditor((state) => state.removeImage);
   const toggleSkip = useEditor((state) => state.toggleSkip);
   const clearImages = useEditor((state) => state.clearImages);
+  const addImages = useEditor((state) => state.addImages);
+  const importsBusy = useEditor((state) => state.importsBusy);
   const activeIndex = images.findIndex((item) => item.id === activeImageId);
   const enabled = images.filter((item) => !item.skipped).length;
 
@@ -36,9 +38,26 @@ export function Filmstrip() {
     <div className="filmstrip">
       <div className="filmstrip-head">
         <span>
-          队列 <b style={{ color: 'var(--ink)' }}>{images.length}</b> 张 · 待处理 {enabled} 张
+          队列 <b style={{ color: 'var(--ink)' }}>{images.length}</b> 张 · 待处理{' '}
+          <b style={{ color: 'var(--ink)' }}>{enabled}</b> 张
+          {importsBusy ? ' · 正在读取…' : ''}
         </span>
         <div className="spacer" />
+        <label className="button button-sm" style={{ cursor: 'pointer' }}>
+          <IconPlus size={13} />
+          添加图片
+          <input
+            type="file"
+            accept="image/*"
+            multiple
+            hidden
+            onChange={(event) => {
+              const files = Array.from(event.target.files ?? []);
+              event.target.value = '';
+              if (files.length) void addImages(files);
+            }}
+          />
+        </label>
         <button
           type="button"
           className="icon-mini"
@@ -102,6 +121,21 @@ export function Filmstrip() {
             </span>
           </button>
         ))}
+        <label className="thumb thumb-add" title="添加更多图片">
+          <IconPlus size={18} />
+          <span>添加</span>
+          <input
+            type="file"
+            accept="image/*"
+            multiple
+            hidden
+            onChange={(event) => {
+              const files = Array.from(event.target.files ?? []);
+              event.target.value = '';
+              if (files.length) void addImages(files);
+            }}
+          />
+        </label>
       </div>
     </div>
   );

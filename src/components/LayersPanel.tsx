@@ -2,12 +2,28 @@ import { useRef } from 'react';
 import { MAX_LAYERS } from '../core/defaults';
 import { useEditor } from '../state/editorStore';
 import type { WatermarkLayer } from '../core/types';
-import { IconCopy, IconEye, IconEyeOff, IconImage, IconPlus, IconText, IconTrash } from './icons';
+import {
+  IconCopy,
+  IconEye,
+  IconEyeOff,
+  IconImage,
+  IconPlus,
+  IconRedact,
+  IconText,
+  IconTrash,
+} from './icons';
 
 const layoutLabel = (layer: WatermarkLayer): string => {
+  if (layer.type === 'redact') return `${layer.regions.length} 个区域`;
   if (layer.layout.mode === 'tile') return '平铺';
   if (layer.layout.mode === 'grid') return `${layer.layout.cols}×${layer.layout.rows} 网格`;
   return '单点';
+};
+
+const LayerIcon = ({ layer }: { layer: WatermarkLayer }) => {
+  if (layer.type === 'text') return <IconText size={13} />;
+  if (layer.type === 'image') return <IconImage size={13} />;
+  return <IconRedact size={13} />;
 };
 
 export function LayersPanel() {
@@ -19,6 +35,7 @@ export function LayersPanel() {
   const duplicateLayer = useEditor((state) => state.duplicateLayer);
   const addTextLayer = useEditor((state) => state.addTextLayer);
   const addImageLayer = useEditor((state) => state.addImageLayer);
+  const addRedactLayer = useEditor((state) => state.addRedactLayer);
   const logoInput = useRef<HTMLInputElement | null>(null);
 
   return (
@@ -57,7 +74,7 @@ export function LayersPanel() {
               }}
             >
               <span className="layer-kind">
-                {layer.type === 'text' ? <IconText size={13} /> : <IconImage size={13} />}
+                <LayerIcon layer={layer} />
               </span>
               <span style={{ minWidth: 0, flex: 1 }}>
                 <span className="layer-name" style={{ display: 'block' }}>
@@ -121,6 +138,17 @@ export function LayersPanel() {
           <IconImage size={14} />
           添加 Logo 水印
         </button>
+        <div className="rail-footer-row">
+          <button
+            type="button"
+            className="button"
+            onClick={addRedactLayer}
+            disabled={layers.length >= MAX_LAYERS}
+          >
+            <IconRedact size={14} />
+            添加打码
+          </button>
+        </div>
         <input
           ref={logoInput}
           type="file"

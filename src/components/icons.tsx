@@ -156,6 +156,14 @@ export const IconLock = (props: IconProps) => (
   </svg>
 );
 
+export const IconRedact = (props: IconProps) => (
+  <svg {...base(props)}>
+    <rect x="3.5" y="6" width="17" height="12" rx="2" strokeDasharray="3 2.5" />
+    <path d="M8 12h.01M12 12h.01M16 12h.01" strokeWidth={2.6} />
+    <path d="M9.5 15.5h5" />
+  </svg>
+);
+
 export const IconCheck = (props: IconProps) => (
   <svg {...base(props)}>
     <path d="m5 13 4 4 10-10" />

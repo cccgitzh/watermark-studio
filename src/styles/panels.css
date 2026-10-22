@@ -631,3 +631,87 @@
   background: var(--line);
   margin: 2px 0;
 }
+
+/* ---------- 打码区域列表 ---------- */
+.region-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.region-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line);
+  background: var(--panel-soft);
+}
+
+.region-index {
+  width: 17px;
+  height: 17px;
+  flex: 0 0 auto;
+  border-radius: 4px;
+  display: grid;
+  place-items: center;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 10px;
+  font-family: var(--font-mono);
+  font-weight: 600;
+}
+
+.region-meta {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.region-nudge {
+  display: flex;
+  gap: 2px;
+}
+
+.region-nudge button {
+  width: 18px;
+  height: 18px;
+  border-radius: 3px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--muted);
+  font-size: 9px;
+  display: grid;
+  place-items: center;
+}
+
+.region-nudge button:hover {
+  color: var(--ink);
+  border-color: var(--line-strong);
+}
+
+.token-button {
+  cursor: pointer;
+  transition: border-color 0.12s, color 0.12s, background 0.12s;
+}
+
+.token-button:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.rail-footer-row {
+  display: flex;
+  gap: 6px;
+}
+
+.rail-footer-row .button {
+  flex: 1;
+}

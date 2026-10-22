@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { layerKindLabel } from '../core/layers';
 import { useEditor } from '../state/editorStore';
 import { ExportPanel } from './ExportPanel';
 import { LayoutPanel } from './LayoutPanel';
@@ -53,7 +54,7 @@ export function Inspector() {
         <div className="spacer" />
         {tab === 'style' && layer ? (
           <span style={{ fontSize: 10.5, color: 'var(--muted)' }}>
-            {layer.type === 'text' ? '文字图层' : '图片图层'}
+            {layerKindLabel(layer)}图层
           </span>
         ) : null}
         {tab === 'preset' ? <IconSparkle size={13} style={{ color: 'var(--muted)' }} /> : null}

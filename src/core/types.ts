@@ -4,7 +4,7 @@
  * 缩略图预览、原始尺寸导出、以及不同分辨率的批量图片上视觉一致。
  */
 
-export type LayerType = 'text' | 'image';
+export type LayerType = 'text' | 'image' | 'redact';
 
 export type BlendMode =
   | 'source-over'
@@ -94,11 +94,11 @@ export interface BaseLayer {
   /** 角度，顺时针为正 */
   rotation: number;
   blend: BlendMode;
-  layout: LayoutConfig;
 }
 
 export interface TextLayer extends BaseLayer {
   type: 'text';
+  layout: LayoutConfig;
   text: string;
   /** CSS font-family 列表 */
   fontFamily: string;
@@ -118,13 +118,39 @@ export interface TextLayer extends BaseLayer {
 
 export interface ImageLayer extends BaseLayer {
   type: 'image';
+  layout: LayoutConfig;
   /** data URL，仅存于内存与配置文件中 */
   src: string;
   /** 宽度，相对画布短边的比例 */
   scale: number;
 }
 
-export type WatermarkLayer = TextLayer | ImageLayer;
+export type RedactMode = 'mosaic' | 'blur' | 'solid';
+
+/** 打码区域，全部使用相对画布的 0~1 比例 */
+export interface RedactRegion {
+  id: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+export interface RedactLayer extends BaseLayer {
+  type: 'redact';
+  mode: RedactMode;
+  regions: RedactRegion[];
+  /** mosaic：色块边长 / blur：模糊半径 / solid：填充色 */
+  blockSize: number;
+  blurRadius: number;
+  color: string;
+  /** 区域圆角，相对画布短边 */
+  radius: number;
+}
+
+export type WatermarkLayer = TextLayer | ImageLayer | RedactLayer;
+/** 参与排版（单点 / 平铺 / 网格）的图层 */
+export type LayoutLayer = TextLayer | ImageLayer;
 
 export type ExportFormat = 'original' | 'png' | 'jpeg' | 'webp';
 
@@ -152,6 +178,14 @@ export interface Preset {
   builtin?: boolean;
   layers: WatermarkLayer[];
   exportSettings?: Partial<ExportSettings>;
+}
+
+/** 文字水印运行时变量（批量导出时按每张图解析） */
+export interface TextVars {
+  fileName?: string;
+  index?: number;
+  total?: number;
+  date?: Date;
 }
 
 export interface Size {

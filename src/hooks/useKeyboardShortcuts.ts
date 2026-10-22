@@ -1,5 +1,13 @@
 import { useEffect } from 'react';
+import { isLayoutLayer } from '../core/layers';
 import { useEditor } from '../state/editorStore';
+
+const ARROW_DELTA: Record<string, [number, number]> = {
+  ArrowUp: [0, -1],
+  ArrowDown: [0, 1],
+  ArrowLeft: [-1, 0],
+  ArrowRight: [1, 0],
+};
 
 const isTypingTarget = (target: EventTarget | null): boolean => {
   if (!(target instanceof HTMLElement)) return false;
@@ -32,6 +40,25 @@ export function useKeyboardShortcuts() {
       if (event.code === 'Space' && !isTypingTarget(event.target)) {
         event.preventDefault();
         setComparing(true);
+        return;
+      }
+
+      // 方向键微调单点水印位置（Shift 更精细）
+      const delta = ARROW_DELTA[event.key];
+      if (delta && !withMeta && !isTypingTarget(event.target)) {
+        const state = useEditor.getState();
+        const layer = state.layers.find((item) => item.id === state.selectedId);
+        if (!layer || !isLayoutLayer(layer) || layer.layout.mode !== 'single') return;
+        event.preventDefault();
+        const step = event.shiftKey ? 0.001 : 0.01;
+        state.updateLayout(
+          layer.id,
+          {
+            offsetX: Math.min(1, Math.max(-1, layer.layout.offsetX + delta[0] * step)),
+            offsetY: Math.min(1, Math.max(-1, layer.layout.offsetY + delta[1] * step)),
+          },
+          `nudge-${layer.id}`,
+        );
       }
     };
 

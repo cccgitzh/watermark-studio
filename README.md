@@ -11,11 +11,11 @@
 ![编辑器界面](docs/screenshots/editor-light.png)
 
 <details>
-<summary>更多截图（标签条样式 / 深色主题 / 移动端）</summary>
+<summary>更多截图（打码 / 标签条样式 / 深色主题 / 移动端）</summary>
 
-| 标签条 + 描边 | 深色主题 | 移动端 390px |
-| --- | --- | --- |
-| ![](docs/screenshots/label-chip.png) | ![](docs/screenshots/editor-dark.png) | ![](docs/screenshots/mobile.png) |
+| 区域打码（马赛克） | 标签条 + 描边 | 深色主题 | 移动端 390px |
+| --- | --- | --- | --- |
+| ![](docs/screenshots/redact.png) | ![](docs/screenshots/label-chip.png) | ![](docs/screenshots/editor-dark.png) | ![](docs/screenshots/mobile.png) |
 
 </details>
 
@@ -30,15 +30,17 @@
 | 维度 | 原项目 | Watermark Studio |
 | --- | --- | --- |
 | 代码组织 | 单文件 60KB，全局函数 + DOM id 耦合 | `core`（纯逻辑）/ `state`（状态）/ `components`（视图）/ `workers`（渲染线程）四层分离，TypeScript 严格模式 |
-| 水印模型 | 单一文字水印 | 多图层（文字 + Logo），每层独立排版、透明度、混合模式与层级顺序 |
+| 水印模型 | 单一文字水印 | 多图层（文字 / Logo / 打码），每层独立排版、透明度、混合模式与层级顺序 |
+| 打码 | 仅靠文字遮盖，没有真正的像素处理 | 区域化打码图层：马赛克 / 模糊 / 纯色，画布拖拽框选、移动、缩放，导出按原始像素重算 |
 | 排版 | 平铺 / 单点（5 个固定位）/ N 个等分 | 单点（九宫格 + 边距 + 百分比偏移 + **画布拖拽**）/ 平铺（横纵间距独立、错行、旋转扩边）/ 网格（任意行列） |
 | 样式 | 字号倍率、颜色、透明度、旋转、加粗斜体 | 字体族与自定义字体上传、字重、字距、行高、斜体、描边、阴影、背景色块（圆角/内边距）、6 种混合模式 |
+| 文本变量 | 无 | `{date}` `{time}` `{datetime}` `{filename}` `{index}` `{total}`，批量导出时按每张图解析 |
 | 批量性能 | 主线程逐张绘制 | `OffscreenCanvas + Worker` 渲染池（并发 2），主线程不卡；不支持时自动回退主线程 |
 | 导出 | 固定格式下载 | 格式（原格式/PNG/JPEG/WebP）、质量、长边上限、命名模板（6 个占位符）、ZIP 打包、剪贴板复制 |
 | 编辑体验 | 无撤销 | 撤销/重做（连续滑动自动合并为一步）、快捷键、按住空格对比原图、主题切换 |
 | 方案复用 | 无 | 6 套内置预设 + 自定义方案（localStorage）+ 方案 JSON 导入导出 |
 | 图片处理 | 直接绘制 | EXIF 方向矫正、超 8192px 自动降采样、上限 60 张、逐张跳过/排序 |
-| 质量保障 | 无测试 | 29 个单元测试（排版断行 / 布局几何 / 命名与格式）、`tsc --noEmit`、GitHub Actions CI |
+| 质量保障 | 无测试 | 35 个单元测试 + 32 项 Playwright 端到端断言、`tsc --noEmit`、GitHub Actions CI |
 | 部署 | GitHub Pages + Docker | EdgeOne Makers / EdgeOne Pages / GitHub Pages / Docker，含 PWA 离线安装 |
 
 ---
@@ -53,14 +55,21 @@
 - **颜色与质感**：任意色值（支持 `rgba()`）、透明度、描边（宽度/颜色）、阴影（模糊/XY 偏移/颜色）、背景色块（颜色/透明度/内外边距/圆角）
 - **叠加**：正常 / 正片叠底 / 滤色 / 叠加 / 柔光 / 差值，+ 旋转 -180°~180°
 - **Logo**：PNG/SVG/WebP/JPEG，宽度按短边比例，同样支持旋转与混合模式
+- **动态变量**：`{date}` `{time}` `{datetime}` `{filename}` `{index}` `{total}`，批量导出时每张图各自解析（适合归档编号、时间戳）
+
+### 打码（真实像素处理）
+- **三种模式**：马赛克（可调色块大小）/ 高斯模糊（可调半径）/ 纯色块（颜色 + 不透明度），统一支持圆角
+- **区域编辑**：画布上拖拽框选新区域、拖动方框移动、右下角手柄缩放、区域列表可逐条删除与微调
+- **安全顺序**：打码层始终绘制在文字 / Logo 之前，水印不会盖住打码区；导出时按原始像素重算，缩放不会让打码失效
+- **失败兜底**：浏览器不支持 `ctx.filter` 时，「模糊」自动降级为马赛克，避免出现「看起来糊了其实没打码」
 
 ### 版式与定位
-- **单点**：九宫格锚点 + 边距 + 水平/垂直百分比偏移，可直接在画布上拖动，或用方向键微调
+- **单点**：九宫格锚点 + 边距 + 水平/垂直百分比偏移，可直接在画布上拖动，或用方向键微调（`Shift` + 方向键更精细）
 - **平铺**：横纵间距独立（按水印自身尺寸计算）、隔行错位、旋转后自动扩边保证四角不漏印
 - **网格**：1~8 行列任意，自动均分
 
 ### 批量与导出
-- **导入**：点击 / 拖拽到窗口任意位置 / `Ctrl+V` 粘贴截图，单批最多 60 张
+- **导入**：点击 / 拖拽到窗口任意位置 / `Ctrl+V` 粘贴截图；队列内可随时用「添加图片」或缩略图末尾的「+」继续追加，单批最多 60 张
 - **队列**：缩略图预览、点击切换、前后排序、单张跳过、单张移除、一键清空
 - **导出**：原格式 / PNG / JPEG / WebP；压缩质量；长边上限（1280~8192）；命名模板 `{name} {index} {date} {w} {h} {ext}`
 - **输出方式**：ZIP 打包、逐张下载、仅当前图片、复制到剪贴板
@@ -105,9 +114,11 @@ npm run typecheck  # 仅类型检查
 watermark-studio/
 ├── src/
 │   ├── core/                   # 领域内核：不依赖 React，可独立测试
-│   │   ├── types.ts            # 文档模型（图层 / 布局 / 导出设置）
+│   │   ├── types.ts            # 文档模型（图层 / 布局 / 打码区域 / 导出设置）
+│   │   ├── layers.ts           # 图层类型守卫（isTextLayer / isRedactLayer …）
 │   │   ├── defaults.ts         # 默认值、字体表、预设、uid、克隆
 │   │   ├── textLayout.ts       # 中英混排断行（避头点 / 避尾点 / 硬切）
+│   │   ├── tokens.ts           # 文字动态变量解析（{date} {filename} …）
 │   │   ├── geometry.ts         # 锚点计算（单点 / 平铺 / 网格）、尺寸适配
 │   │   ├── renderer.ts         # 唯一的绘制入口：底图 + 图层 → Canvas
 │   │   ├── imageSource.ts      # 解码、EXIF 纠正、降采样、dataURL 互转
@@ -131,7 +142,8 @@ watermark-studio/
 │   │   ├── DropZone.tsx  ToastHost.tsx  ProgressOverlay.tsx  icons.tsx
 │   ├── styles/                  # tokens.css（设计变量）/ base.css / panels.css
 │   ├── App.tsx  main.tsx
-├── tests/                       # 29 个单测：断行 / 几何 / 命名与格式
+├── tests/                       # 35 个单测：断行 / 几何 / 命名 / 变量
+│   └── e2e/                     # Playwright 冒烟：导入 → 编辑 → 打码 → 导出（32 断言）
 ├── public/                      # favicon / manifest / service worker
 ├── docs/PLAN.md                 # 项目规划、功能清单、技术选型与路线图
 ├── .github/workflows/           # CI（类型检查 + 测试 + 构建）与 EdgeOne 部署
@@ -222,7 +234,9 @@ Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'
 ## 测试
 
 ```bash
-npm test
+npm test          # 35 个单元测试（vitest）
+npm run build     # 类型检查 + 生产构建
+npm run test:e2e  # 32 项端到端断言（需本机 Chrome，脚本会自动起 preview）
 ```
 
 | 文件 | 覆盖 |
@@ -230,19 +244,25 @@ npm test
 | `tests/textLayout.test.ts` | 显式换行、折行宽度、避头点、避尾点、拉丁不拆词、超长硬切、空文本 |
 | `tests/geometry.test.ts` | 九宫格坐标、边距与偏移、平铺覆盖率与对称性、旋转扩边、错行、网格数量与兜底、长边缩放 |
 | `tests/export.test.ts` | MIME 映射（含 GIF/SVG → PNG）、扩展名、命名模板六种占位符、非法字符过滤、回退规则 |
+| `tests/tokens.test.ts` | 日期/时间/文件名/序号替换、大小写不敏感、未知占位符、缺值兜底 |
+| `tests/e2e/smoke.mjs` | 首张上传后**继续添加**、水印绘制与对比原图、撤销/重做、拖拽定位、方向键微调、三种打码模式的像素级验证、预设、ZIP / 单张导出、深色主题、390px 响应式、零外部请求 |
 
-另有本地 Chromium 端到端冒烟验证（上传 2 张 → 编辑图层 → 撤销/重做 → 拖拽定位 → 应用预设 → 批量导出 ZIP → 逐张下载 → 深色主题 → 390px 响应式），26 项断言全部通过，且校验了「零外部请求」「无控制台错误」。该脚本依赖本机已安装的浏览器，暂未入库（见路线图）。
+> 打码相关断言不是「截图看着对」：脚本会读取画布像素，计算区域内的高频能量与标准差，验证马赛克把块内细节抹平、模糊降低梯度、纯色把区域方差压到近 0。
+>
+> `npm run test:e2e` 使用 `channel: 'chrome'`（本机已安装的 Chrome），不需要下载 Playwright 浏览器；也可用 `E2E_BASE_URL=https://... npm run test:e2e` 直接验线上地址。
 
 ---
 
 ## 路线图
 
-- [ ] 图形水印（矩形遮罩 / 马赛克 / 模糊区域，用于证件号打码）
+- [x] 图形打码（马赛克 / 模糊 / 纯色区域，证件号遮挡）
+- [x] 文字动态变量（时间戳 / 文件名 / 序号）
+- [x] Playwright 端到端用例入库（`npm run test:e2e`）
 - [ ] 每张图片独立覆盖水印参数（当前为全局统一）
-- [ ] 二维码 / 时间戳水印图层
-- [ ] 拖拽调整平铺网格的手柄
+- [ ] 二维码水印图层
+- [ ] 打码区域的椭圆 / 画笔自由形状
+- [ ] 端到端用例接入 GitHub Actions（Runner 自带 Chrome）
 - [ ] 中英双语界面（i18n）
-- [ ] Playwright 端到端用例纳入 CI
 
 ## 许可
 

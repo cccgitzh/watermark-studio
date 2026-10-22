@@ -3,17 +3,21 @@ import {
   builtinPresets,
   cloneDoc,
   createImageLayer,
+  createRedactLayer,
   createTextLayer,
   defaultExportSettings,
+  MAX_IMAGES,
   MAX_LAYERS,
   uid,
 } from '../core/defaults';
+import { isLayoutLayer } from '../core/layers';
 import { isImageFile, decodeImage, blobToDataUrl } from '../core/imageSource';
 import type {
   ExportSettings,
   ImageLayer,
   LayoutConfig,
   Preset,
+  RedactRegion,
   TextLayer,
   WatermarkLayer,
 } from '../core/types';
@@ -107,6 +111,15 @@ export interface EditorState {
 
   addTextLayer: () => void;
   addImageLayer: (file: File) => Promise<void>;
+  addRedactLayer: () => void;
+  addRedactRegion: (layerId: string, region: RedactRegion) => void;
+  updateRedactRegion: (
+    layerId: string,
+    regionId: string,
+    patch: Partial<RedactRegion>,
+    coalesceKey?: string,
+  ) => void;
+  removeRedactRegion: (layerId: string, regionId: string) => void;
   updateLayer: (id: string, patch: Partial<WatermarkLayer>, coalesceKey?: string) => void;
   updateLayout: (id: string, patch: Partial<LayoutConfig>, coalesceKey?: string) => void;
   applyTextPatch: (id: string, patch: Partial<TextLayer>, coalesceKey?: string) => void;
@@ -197,10 +210,19 @@ export const useEditor = create<EditorState>()((set, get) => {
     futureCount: 0,
 
     addImages: async (files) => {
-      const accepted = files.filter(isImageFile).slice(0, 60);
-      if (!accepted.length) {
+      const imageFiles = files.filter(isImageFile);
+      if (!imageFiles.length) {
         get().pushToast('没有可用的图片文件', 'error');
         return;
+      }
+      const room = MAX_IMAGES - get().images.length;
+      if (room <= 0) {
+        get().pushToast(`队列已满（最多 ${MAX_IMAGES} 张），请先移除部分图片`, 'error');
+        return;
+      }
+      const accepted = imageFiles.slice(0, room);
+      if (imageFiles.length > accepted.length) {
+        get().pushToast(`队列上限 ${MAX_IMAGES} 张，已忽略多余的图片`, 'info');
       }
       set({ importsBusy: true });
       const added: ImageItem[] = [];
@@ -222,7 +244,7 @@ export const useEditor = create<EditorState>()((set, get) => {
         }
       }
       set((state) => {
-        const images = [...state.images, ...added].slice(0, 60);
+        const images = [...state.images, ...added].slice(0, MAX_IMAGES);
         return {
           images,
           importsBusy: false,
@@ -299,6 +321,49 @@ export const useEditor = create<EditorState>()((set, get) => {
       }
     },
 
+    addRedactLayer: () => {
+      if (get().layers.length >= MAX_LAYERS) {
+        get().pushToast(`最多支持 ${MAX_LAYERS} 个水印图层`, 'error');
+        return;
+      }
+      const layer = createRedactLayer({
+        name: `打码 ${get().layers.filter((item) => item.type === 'redact').length + 1}`,
+      });
+      commit([...get().layers, layer], undefined, { selectedId: layer.id });
+    },
+
+    addRedactRegion: (layerId, region) => {
+      const layers = get().layers.map((layer) =>
+        layer.id === layerId && layer.type === 'redact'
+          ? { ...layer, regions: [...layer.regions, region] }
+          : layer,
+      );
+      commit(layers);
+    },
+
+    updateRedactRegion: (layerId, regionId, patch, coalesceKey) => {
+      const layers = get().layers.map((layer) =>
+        layer.id === layerId && layer.type === 'redact'
+          ? {
+              ...layer,
+              regions: layer.regions.map((item) =>
+                item.id === regionId ? { ...item, ...patch } : item,
+              ),
+            }
+          : layer,
+      );
+      commit(layers, coalesceKey);
+    },
+
+    removeRedactRegion: (layerId, regionId) => {
+      const layers = get().layers.map((layer) =>
+        layer.id === layerId && layer.type === 'redact'
+          ? { ...layer, regions: layer.regions.filter((item) => item.id !== regionId) }
+          : layer,
+      );
+      commit(layers);
+    },
+
     updateLayer: (id, patch, coalesceKey) => {
       const layers = get().layers.map((layer) =>
         layer.id === id ? ({ ...layer, ...patch } as WatermarkLayer) : layer,
@@ -308,7 +373,9 @@ export const useEditor = create<EditorState>()((set, get) => {
 
     updateLayout: (id, patch, coalesceKey) => {
       const layers = get().layers.map((layer) =>
-        layer.id === id ? { ...layer, layout: { ...layer.layout, ...patch } } : layer,
+        layer.id === id && isLayoutLayer(layer)
+          ? { ...layer, layout: { ...layer.layout, ...patch } }
+          : layer,
       ) as WatermarkLayer[];
       commit(layers, coalesceKey);
     },
@@ -332,7 +399,8 @@ export const useEditor = create<EditorState>()((set, get) => {
         get().pushToast(`最多支持 ${MAX_LAYERS} 个水印图层`, 'error');
         return;
       }
-      const copy = { ...cloneDoc(source), id: uid(source.type === 'text' ? 'txt' : 'img') };
+      const prefix = source.type === 'text' ? 'txt' : source.type === 'image' ? 'img' : 'rdt';
+      const copy = { ...cloneDoc(source), id: uid(prefix) };
       copy.name = `${source.name} 副本`;
       commit([...get().layers, copy], undefined, { selectedId: copy.id });
     },
@@ -355,7 +423,7 @@ export const useEditor = create<EditorState>()((set, get) => {
     applyPreset: (preset) => {
       const layers = preset.layers.map((layer) => ({
         ...cloneDoc(layer),
-        id: uid(layer.type === 'text' ? 'txt' : 'img'),
+        id: uid(layer.type === 'text' ? 'txt' : layer.type === 'image' ? 'img' : 'rdt'),
       })) as WatermarkLayer[];
       commit(layers, undefined, {
         selectedId: layers[0]?.id ?? null,

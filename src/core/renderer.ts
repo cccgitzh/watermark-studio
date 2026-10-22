@@ -1,16 +1,32 @@
 import { computeAnchors } from './geometry';
+import { isLayoutLayer, isRedactLayer } from './layers';
 import { breakText } from './textLayout';
-import type { Ctx2D, ImageLayer, ImageSources, Size, TextLayer, WatermarkLayer } from './types';
+import { resolveTokens } from './tokens';
+import type {
+  Ctx2D,
+  ImageLayer,
+  ImageSources,
+  RedactLayer,
+  Size,
+  TextLayer,
+  TextVars,
+  WatermarkLayer,
+} from './types';
 
 export interface RenderRequest {
   width: number;
   height: number;
   layers: WatermarkLayer[];
   logos?: ImageSources;
+  /** 文字变量：批量导出时按每张图传入 */
+  vars?: TextVars;
 }
 
 const supportsLetterSpacing = (ctx: Ctx2D): boolean =>
   'letterSpacing' in (ctx as unknown as Record<string, unknown>);
+
+const supportsFilter = (ctx: Ctx2D): boolean =>
+  'filter' in (ctx as unknown as Record<string, unknown>);
 
 function fontString(layer: TextLayer, fontPx: number): string {
   return `${layer.italic ? 'italic ' : ''}${layer.fontWeight} ${fontPx}px ${layer.fontFamily}`;
@@ -50,6 +66,28 @@ function roundRectPath(ctx: Ctx2D, x: number, y: number, w: number, h: number, r
   ctx.closePath();
 }
 
+/** 临时画布：Worker 与主线程通用 */
+function createScratch(
+  width: number,
+  height: number,
+): { source: CanvasImageSource; ctx: Ctx2D } | null {
+  const w = Math.max(1, Math.round(width));
+  const h = Math.max(1, Math.round(height));
+  if (typeof OffscreenCanvas !== 'undefined') {
+    const canvas = new OffscreenCanvas(w, h);
+    const ctx = canvas.getContext('2d');
+    if (ctx) return { source: canvas, ctx: ctx as Ctx2D };
+  }
+  if (typeof document !== 'undefined') {
+    const canvas = document.createElement('canvas');
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext('2d');
+    if (ctx) return { source: canvas, ctx };
+  }
+  return null;
+}
+
 /** 逐字排版，作为 letterSpacing 不受支持时的兜底 */
 function fillLineWithSpacing(
   ctx: Ctx2D,
@@ -79,7 +117,7 @@ interface TextBlock {
   lineHeight: number;
 }
 
-function layoutText(ctx: Ctx2D, layer: TextLayer, canvas: Size): TextBlock {
+function layoutText(ctx: Ctx2D, layer: TextLayer, text: string, canvas: Size): TextBlock {
   const shortEdge = Math.min(canvas.width, canvas.height);
   const fontPx = Math.max(6, layer.fontSize * shortEdge);
   ctx.font = fontString(layer, fontPx);
@@ -90,7 +128,7 @@ function layoutText(ctx: Ctx2D, layer: TextLayer, canvas: Size): TextBlock {
   }
 
   const maxWidth = Math.min(canvas.width * 0.9, fontPx * 16);
-  const lines = breakText(layer.text, maxWidth, (value) => ctx.measureText(value).width);
+  const lines = breakText(text, maxWidth, (value) => ctx.measureText(value).width);
   const widths = lines.map((line) => ctx.measureText(line).width);
   const lineHeight = fontPx * Math.max(0.8, layer.lineHeight);
 
@@ -104,8 +142,8 @@ function layoutText(ctx: Ctx2D, layer: TextLayer, canvas: Size): TextBlock {
   };
 }
 
-function drawTextLayer(ctx: Ctx2D, layer: TextLayer, canvas: Size): void {
-  const block = layoutText(ctx, layer, canvas);
+function drawTextLayer(ctx: Ctx2D, layer: TextLayer, canvas: Size, text: string): void {
+  const block = layoutText(ctx, layer, text, canvas);
   if (!block.lines.length) return;
 
   const padPx = layer.chip.enabled ? layer.chip.padding * block.fontPx : 0;
@@ -225,27 +263,113 @@ function drawImageLayer(ctx: Ctx2D, layer: ImageLayer, canvas: Size, logos: Imag
   }
 }
 
+/**
+ * 打码：直接作用于当前画布像素（底图 + 先前打码区域），
+ * 因此必须在文字 / Logo 之前执行，避免水印覆盖打码区造成信息泄露。
+ */
+function drawRedactLayer(ctx: Ctx2D, layer: RedactLayer, canvas: Size): void {
+  if (!layer.regions.length) return;
+  const shortEdge = Math.min(canvas.width, canvas.height);
+  const canFilter = supportsFilter(ctx);
+
+  for (const region of layer.regions) {
+    const w = region.w * canvas.width;
+    const h = region.h * canvas.height;
+    if (w < 1 || h < 1) continue;
+    const x = region.x * canvas.width;
+    const y = region.y * canvas.height;
+    const radius = Math.max(0, layer.radius * shortEdge);
+
+    ctx.save();
+    ctx.globalCompositeOperation = 'source-over';
+    roundRectPath(ctx, x, y, w, h, radius);
+    ctx.clip();
+
+    const solidFallback = () => {
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = layer.color;
+      ctx.fillRect(x, y, w, h);
+    };
+
+    if (layer.mode === 'solid') {
+      ctx.globalAlpha = Math.max(0.2, Math.min(1, layer.opacity));
+      ctx.fillStyle = layer.color;
+      ctx.fillRect(x, y, w, h);
+    } else if (layer.mode === 'mosaic' || !canFilter) {
+      // 不支持 filter 的浏览器把「模糊」降级为马赛克，确保打码一定有效
+      const ratio = layer.mode === 'mosaic' ? layer.blockSize : layer.blurRadius * 2;
+      const block = Math.max(2, ratio * shortEdge);
+      const tw = Math.max(1, Math.round(w / block));
+      const th = Math.max(1, Math.round(h / block));
+      const scratch = createScratch(tw, th);
+      if (!scratch) {
+        solidFallback();
+      } else {
+        scratch.ctx.imageSmoothingEnabled = true;
+        // 从画布自身取样缩小 → 关闭平滑再放大，形成像素块
+        scratch.ctx.drawImage(ctx.canvas as CanvasImageSource, x, y, w, h, 0, 0, tw, th);
+        ctx.imageSmoothingEnabled = false;
+        ctx.drawImage(scratch.source, 0, 0, tw, th, x, y, w, h);
+        ctx.imageSmoothingEnabled = true;
+      }
+    } else {
+      // 模糊：区域含外扩一起拷贝，再带滤镜 1:1 绘回，避免边缘发虚
+      const blurPx = Math.max(4, layer.blurRadius * shortEdge);
+      const pad = Math.ceil(blurPx * 2);
+      const sx = Math.max(0, Math.floor(x - pad));
+      const sy = Math.max(0, Math.floor(y - pad));
+      const ex = Math.min(canvas.width, Math.ceil(x + w + pad));
+      const ey = Math.min(canvas.height, Math.ceil(y + h + pad));
+      const sw = Math.max(1, ex - sx);
+      const sh = Math.max(1, ey - sy);
+      const scratch = createScratch(sw, sh);
+      if (!scratch) {
+        solidFallback();
+      } else {
+        scratch.ctx.drawImage(ctx.canvas as CanvasImageSource, sx, sy, sw, sh, 0, 0, sw, sh);
+        ctx.filter = `blur(${blurPx}px)`;
+        ctx.drawImage(scratch.source, 0, 0, sw, sh, sx, sy, sw, sh);
+        ctx.filter = 'none';
+      }
+    }
+
+    ctx.restore();
+  }
+}
+
 /** 在画布上绘制底图 + 全部可见水印图层 */
 export function renderComposite(
   ctx: Ctx2D,
   source: CanvasImageSource,
   request: RenderRequest,
 ): void {
-  const { width, height, layers, logos = {} } = request;
+  const { width, height, layers, logos = {}, vars } = request;
   ctx.save();
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.globalAlpha = 1;
   ctx.globalCompositeOperation = 'source-over';
+  ctx.filter = 'none';
   ctx.clearRect(0, 0, width, height);
   ctx.drawImage(source, 0, 0, width, height);
   ctx.restore();
 
   const canvas: Size = { width, height };
-  for (const layer of layers) {
-    if (!layer.visible) continue;
+  const visible = layers.filter((layer) => layer.visible);
+
+  // 1) 打码层优先，作用于原始像素
+  for (const layer of visible) {
+    if (!isRedactLayer(layer)) continue;
+    ctx.save();
+    drawRedactLayer(ctx, layer, canvas);
+    ctx.restore();
+  }
+
+  // 2) 水印层按图层顺序叠加
+  for (const layer of visible) {
+    if (!isLayoutLayer(layer)) continue;
     ctx.save();
     if (layer.type === 'text') {
-      drawTextLayer(ctx, layer, canvas);
+      drawTextLayer(ctx, layer, canvas, resolveTokens(layer.text, vars));
     } else {
       drawImageLayer(ctx, layer, canvas, logos);
     }

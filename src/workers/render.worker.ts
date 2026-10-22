@@ -1,6 +1,6 @@
 import { encodeCanvas } from '../core/export';
 import { renderComposite } from '../core/renderer';
-import type { WatermarkLayer } from '../core/types';
+import type { TextVars, WatermarkLayer } from '../core/types';
 
 export interface WorkerRenderJob {
   id: string;
@@ -9,6 +9,7 @@ export interface WorkerRenderJob {
   height: number;
   layers: WatermarkLayer[];
   logos: Record<string, ImageBitmap>;
+  vars?: TextVars;
   mime: string;
   quality: number;
   flattenColor: string;
@@ -45,6 +46,7 @@ scope.onmessage = async (event: MessageEvent<WorkerRequest>) => {
       height: job.height,
       layers: job.layers,
       logos: job.logos,
+      vars: job.vars,
     });
 
     const blob = await encodeCanvas(canvas, job.mime, job.quality);

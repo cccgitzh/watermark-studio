@@ -103,7 +103,7 @@ export async function runBatch(mode: BatchMode): Promise<void> {
   let failed = 0;
   let cursor = 0;
 
-  const renderOne = async (item: ImageItem): Promise<void> => {
+  const renderOne = async (item: ImageItem, index: number): Promise<void> => {
     const mime = mode === 'copy' ? 'image/png' : resolveMime(settings.format, item.mime);
     const size = fitSize({ width: item.width, height: item.height }, settings.maxSize);
     const job: RenderJobInput = {
@@ -112,6 +112,7 @@ export async function runBatch(mode: BatchMode): Promise<void> {
       height: size.height,
       layers: visibleLayers,
       logos,
+      vars: { fileName: item.name, index, total: targets.length },
       mime,
       quality: settings.quality,
       flattenColor: settings.flattenColor,
@@ -121,7 +122,7 @@ export async function runBatch(mode: BatchMode): Promise<void> {
     const name = uniqueName(
       buildFileName(settings.nameTemplate, {
         name: item.name,
-        index: results.length,
+        index,
         width: size.width,
         height: size.height,
         ext: extFromMime(mime),
@@ -138,7 +139,7 @@ export async function runBatch(mode: BatchMode): Promise<void> {
       cursor += 1;
       const item = targets[index];
       try {
-        await renderOne(item);
+        await renderOne(item, index);
       } catch (error) {
         failed += 1;
         console.error('[watermark] render failed', item.name, error);

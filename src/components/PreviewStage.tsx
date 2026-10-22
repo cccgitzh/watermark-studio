@@ -1,11 +1,20 @@
-import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import { formatBytes } from '../core/imageSource';
+import { isLayoutLayer, isRedactLayer } from '../core/layers';
 import { renderComposite } from '../core/renderer';
+import type { RedactRegion } from '../core/types';
 import { useLogoImages } from '../hooks/useLogoImages';
 import { useEditor } from '../state/editorStore';
 import { DropZone } from './DropZone';
 import { Filmstrip } from './Filmstrip';
-import { IconCompare } from './icons';
+import { IconCompare, IconRedact } from './icons';
+
+type RegionDrag =
+  | { kind: 'move' | 'resize'; id: string; startX: number; startY: number; origin: RedactRegion }
+  | { kind: 'create'; startX: number; startY: number };
+
+const MIN_REGION = 0.012;
+const clamp01 = (value: number): number => Math.min(1, Math.max(0, value));
 
 export function PreviewStage() {
   const images = useEditor((state) => state.images);
@@ -17,13 +26,19 @@ export function PreviewStage() {
   const setComparing = useEditor((state) => state.setComparing);
   const selectedId = useEditor((state) => state.selectedId);
   const updateLayout = useEditor((state) => state.updateLayout);
+  const addRedactRegion = useEditor((state) => state.addRedactRegion);
+  const updateRedactRegion = useEditor((state) => state.updateRedactRegion);
+  const removeRedactRegion = useEditor((state) => state.removeRedactRegion);
   const logos = useLogoImages(layers);
 
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [display, setDisplay] = useState({ width: 0, height: 0 });
-  const [dragging, setDragging] = useState(false);
-  const dragRef = useRef<{
+  const [stageDragging, setStageDragging] = useState(false);
+  const [activeRegionId, setActiveRegionId] = useState<string | null>(null);
+  const [draft, setDraft] = useState<RedactRegion | null>(null);
+  const [regionDrag, setRegionDrag] = useState<RegionDrag | null>(null);
+  const stageDrag = useRef<{
     pointerId: number;
     startX: number;
     startY: number;
@@ -34,7 +49,18 @@ export function PreviewStage() {
   } | null>(null);
 
   const selectedLayer = layers.find((layer) => layer.id === selectedId) ?? null;
-  const canDrag = Boolean(selectedLayer && selectedLayer.layout.mode === 'single') && !comparing;
+  const redactLayer =
+    selectedLayer && isRedactLayer(selectedLayer) && selectedLayer.visible ? selectedLayer : null;
+  const canDragStage =
+    Boolean(selectedLayer && isLayoutLayer(selectedLayer) && selectedLayer.layout.mode === 'single') &&
+    !comparing;
+  const canDrawRegion = Boolean(redactLayer) && !comparing;
+
+  // 预览固定变量：当前图片名 + 第 1 张
+  const previewVars = useMemo(
+    () => ({ fileName: activeImage?.name ?? '', index: 0, total: 1 }),
+    [activeImage?.name],
+  );
 
   // 自适应容器尺寸
   useEffect(() => {
@@ -85,18 +111,124 @@ export function PreviewStage() {
         height: backingH,
         layers,
         logos,
+        vars: previewVars,
       });
     });
 
     return () => cancelAnimationFrame(frame);
-  }, [activeImage, display, layers, logos, comparing]);
+  }, [activeImage, display, layers, logos, comparing, previewVars]);
 
-  const handlePointerDown = (event: ReactPointerEvent<HTMLCanvasElement>) => {
-    if (!canDrag || !selectedLayer || selectedLayer.layout.mode !== 'single') return;
+  // 选中打码图层时默认选中第一个区域
+  useEffect(() => {
+    if (!redactLayer) {
+      setActiveRegionId(null);
+      return;
+    }
+    setActiveRegionId((current) => {
+      if (current && redactLayer.regions.some((item) => item.id === current)) return current;
+      return redactLayer.regions[0]?.id ?? null;
+    });
+  }, [redactLayer]);
+
+  const toNormalized = (clientX: number, clientY: number) => {
+    const rect = canvasRef.current?.getBoundingClientRect();
+    if (!rect) return { x: 0, y: 0 };
+    return {
+      x: clamp01((clientX - rect.left) / Math.max(1, rect.width)),
+      y: clamp01((clientY - rect.top) / Math.max(1, rect.height)),
+    };
+  };
+
+  // 打码区域：移动 / 缩放 / 框选草稿
+  useEffect(() => {
+    if (!regionDrag) return;
+
+    const onMove = (event: PointerEvent) => {
+      const point = toNormalized(event.clientX, event.clientY);
+      const drag = regionDrag;
+
+      if (drag.kind === 'create') {
+        setDraft({
+          id: 'draft',
+          x: Math.min(drag.startX, point.x),
+          y: Math.min(drag.startY, point.y),
+          w: Math.abs(point.x - drag.startX),
+          h: Math.abs(point.y - drag.startY),
+        });
+        return;
+      }
+      if (!redactLayer) return;
+      const origin = drag.origin;
+      if (drag.kind === 'move') {
+        updateRedactRegion(
+          redactLayer.id,
+          drag.id,
+          {
+            x: Math.min(Math.max(0, origin.x + (point.x - drag.startX)), 1 - origin.w),
+            y: Math.min(Math.max(0, origin.y + (point.y - drag.startY)), 1 - origin.h),
+          },
+          `region-${drag.id}`,
+        );
+        return;
+      }
+      updateRedactRegion(
+        redactLayer.id,
+        drag.id,
+        {
+          w: Math.min(Math.max(MIN_REGION, origin.w + (point.x - drag.startX)), 1 - origin.x),
+          h: Math.min(Math.max(MIN_REGION, origin.h + (point.y - drag.startY)), 1 - origin.y),
+        },
+        `region-${drag.id}`,
+      );
+    };
+
+    const onUp = () => {
+      if (regionDrag.kind === 'create' && redactLayer) {
+        // 只有真正拖出面积才落成区域，避免单击误建
+        setDraft((current) => {
+          if (current && current.w >= MIN_REGION && current.h >= MIN_REGION) {
+            const region: RedactRegion = {
+              id: `rg_${Math.random().toString(36).slice(2, 9)}`,
+              x: current.x,
+              y: current.y,
+              w: current.w,
+              h: current.h,
+            };
+            addRedactRegion(redactLayer.id, region);
+            setActiveRegionId(region.id);
+          }
+          return null;
+        });
+      }
+      setRegionDrag(null);
+    };
+
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+    window.addEventListener('pointercancel', onUp);
+    return () => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+      window.removeEventListener('pointercancel', onUp);
+    };
+  }, [regionDrag, redactLayer, updateRedactRegion, addRedactRegion]);
+
+  const handleCanvasPointerDown = (event: ReactPointerEvent<HTMLCanvasElement>) => {
+    if (comparing || event.button !== 0) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
+
+    if (redactLayer) {
+      const point = toNormalized(event.clientX, event.clientY);
+      setRegionDrag({ kind: 'create', startX: point.x, startY: point.y });
+      setActiveRegionId(null);
+      return;
+    }
+
+    if (!canDragStage || !selectedLayer || !isLayoutLayer(selectedLayer)) return;
+    if (selectedLayer.layout.mode !== 'single') return;
     canvas.setPointerCapture(event.pointerId);
-    dragRef.current = {
+    stageDrag.current = {
       pointerId: event.pointerId,
       startX: event.clientX,
       startY: event.clientY,
@@ -105,12 +237,13 @@ export function PreviewStage() {
       width: canvas.clientWidth,
       height: canvas.clientHeight,
     };
-    setDragging(true);
+    setStageDragging(true);
   };
 
-  const handlePointerMove = (event: ReactPointerEvent<HTMLCanvasElement>) => {
-    const drag = dragRef.current;
+  const handleCanvasPointerMove = (event: ReactPointerEvent<HTMLCanvasElement>) => {
+    const drag = stageDrag.current;
     if (!drag || drag.pointerId !== event.pointerId || !selectedLayer) return;
+    if (!isLayoutLayer(selectedLayer)) return;
     const dx = (event.clientX - drag.startX) / Math.max(1, drag.width);
     const dy = (event.clientY - drag.startY) / Math.max(1, drag.height);
     updateLayout(
@@ -123,15 +256,43 @@ export function PreviewStage() {
     );
   };
 
-  const handlePointerUp = (event: ReactPointerEvent<HTMLCanvasElement>) => {
-    const drag = dragRef.current;
+  const handleCanvasPointerUp = (event: ReactPointerEvent<HTMLCanvasElement>) => {
+    const drag = stageDrag.current;
     if (drag && canvasRef.current?.hasPointerCapture(drag.pointerId)) {
       canvasRef.current.releasePointerCapture(drag.pointerId);
     }
-    dragRef.current = null;
-    setDragging(false);
+    stageDrag.current = null;
+    setStageDragging(false);
     void event;
   };
+
+  const startRegionDrag = (
+    event: ReactPointerEvent<HTMLElement>,
+    kind: 'move' | 'resize',
+    region: RedactRegion,
+  ) => {
+    if (event.button !== 0) return;
+    event.stopPropagation();
+    event.preventDefault();
+    const point = toNormalized(event.clientX, event.clientY);
+    setActiveRegionId(region.id);
+    setRegionDrag({ kind, id: region.id, startX: point.x, startY: point.y, origin: region });
+  };
+
+  const canvasClass = [
+    'preview-canvas',
+    canDragStage && !redactLayer ? 'is-draggable' : '',
+    canDrawRegion ? 'is-redact' : '',
+    stageDragging ? 'is-dragging' : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
+
+  const overlayRegions = redactLayer ? redactLayer.regions : [];
+  const showDraft = Boolean(draft);
+  const hintText = redactLayer
+    ? '拖动框选打码区域 · 拖动方框移动 · 右下角缩放'
+    : '拖动可直接调整水印位置 · 方向键微调';
 
   return (
     <section className="stage">
@@ -147,6 +308,20 @@ export function PreviewStage() {
             <span className="stage-dim">{formatBytes(activeImage.size)}</span>
             <span className="stage-dim">{activeImage.mime.replace('image/', '').toUpperCase()}</span>
             <div className="spacer" />
+            <label className="button button-sm button-ghost" style={{ cursor: 'pointer' }}>
+              添加图片
+              <input
+                type="file"
+                accept="image/*"
+                multiple
+                hidden
+                onChange={(event) => {
+                  const files = Array.from(event.target.files ?? []);
+                  event.target.value = '';
+                  if (files.length) void useEditor.getState().addImages(files);
+                }}
+              />
+            </label>
             <button
               type="button"
               className={comparing ? 'button button-sm' : 'button button-sm button-ghost'}
@@ -167,18 +342,75 @@ export function PreviewStage() {
           <div className="canvas-shell">
             <canvas
               ref={canvasRef}
-              className={`preview-canvas${canDrag ? ' is-draggable' : ''}${
-                dragging ? ' is-dragging' : ''
-              }`}
+              className={canvasClass}
               style={{ width: display.width, height: display.height }}
-              onPointerDown={handlePointerDown}
-              onPointerMove={handlePointerMove}
-              onPointerUp={handlePointerUp}
-              onPointerCancel={handlePointerUp}
+              onPointerDown={handleCanvasPointerDown}
+              onPointerMove={handleCanvasPointerMove}
+              onPointerUp={handleCanvasPointerUp}
+              onPointerCancel={handleCanvasPointerUp}
             />
+
+            {redactLayer ? (
+              <div className="redact-overlay">
+                {overlayRegions.map((region, index) => (
+                  <div
+                    key={region.id}
+                    className={
+                      region.id === activeRegionId ? 'redact-region is-active' : 'redact-region'
+                    }
+                    style={{
+                      left: `${region.x * 100}%`,
+                      top: `${region.y * 100}%`,
+                      width: `${region.w * 100}%`,
+                      height: `${region.h * 100}%`,
+                    }}
+                    onPointerDown={(event) => startRegionDrag(event, 'move', region)}
+                    role="presentation"
+                  >
+                    <span className="redact-region-tag">{index + 1}</span>
+                    {region.id === activeRegionId ? (
+                      <>
+                        <button
+                          type="button"
+                          className="redact-remove"
+                          title="删除该区域"
+                          onPointerDown={(event) => event.stopPropagation()}
+                          onClick={() => {
+                            removeRedactRegion(redactLayer.id, region.id);
+                            setActiveRegionId(null);
+                          }}
+                        >
+                          ×
+                        </button>
+                        <span
+                          className="redact-handle"
+                          role="presentation"
+                          onPointerDown={(event) => startRegionDrag(event, 'resize', region)}
+                        />
+                      </>
+                    ) : null}
+                  </div>
+                ))}
+                {draft ? (
+                  <div
+                    className="redact-region is-draft"
+                    style={{
+                      left: `${draft.x * 100}%`,
+                      top: `${draft.y * 100}%`,
+                      width: `${draft.w * 100}%`,
+                      height: `${draft.h * 100}%`,
+                    }}
+                  />
+                ) : null}
+              </div>
+            ) : null}
+
             {comparing ? <div className="compare-tag">原图预览</div> : null}
-            {canDrag && !dragging ? (
-              <div className="drag-badge">拖动可直接调整水印位置</div>
+            {(canDrawRegion || canDragStage) && !regionDrag && !stageDragging && !showDraft ? (
+              <div className="drag-badge">
+                {redactLayer ? <IconRedact size={12} /> : null}
+                {hintText}
+              </div>
             ) : null}
           </div>
         ) : (

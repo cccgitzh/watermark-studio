@@ -48,10 +48,8 @@ async function decodeWithElement(blob: Blob): Promise<LoadedImage> {
       image.onerror = () => reject(new Error('图片解码失败，可能是浏览器不支持的格式'));
       image.src = url;
     });
-    const width = image.naturalWidth || image.width;
-    const height = image.naturalHeight || image.height;
     const bitmap = await createImageBitmap(image);
-    return { bitmap, width, height };
+    return await normalize(bitmap);
   } finally {
     URL.revokeObjectURL(url);
   }

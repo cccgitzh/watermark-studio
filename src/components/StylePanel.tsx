@@ -1,7 +1,15 @@
 import { useRef } from 'react';
 import { BLEND_OPTIONS, FONT_OPTIONS } from '../core/defaults';
+import { TEXT_TOKENS } from '../core/tokens';
 import { useEditor } from '../state/editorStore';
-import type { BlendMode, ImageLayer, TextLayer, WatermarkLayer } from '../core/types';
+import type {
+  BlendMode,
+  ImageLayer,
+  RedactLayer,
+  RedactMode,
+  TextLayer,
+  WatermarkLayer,
+} from '../core/types';
 import {
   ColorField,
   Field,
@@ -24,7 +32,9 @@ export function StylePanel({ layer }: { layer: WatermarkLayer | null }) {
       </div>
     );
   }
-  return layer.type === 'text' ? <TextStyle layer={layer} /> : <ImageStyle layer={layer} />;
+  if (layer.type === 'text') return <TextStyle layer={layer} />;
+  if (layer.type === 'image') return <ImageStyle layer={layer} />;
+  return <RedactStyle layer={layer} />;
 }
 
 function CommonSection({ layer }: { layer: WatermarkLayer }) {
@@ -128,6 +138,27 @@ function TextStyle({ layer }: { layer: TextLayer }) {
           }}
         />
         <Hint>自定义字体只保存在当前浏览器会话中，不会写入方案文件。</Hint>
+        <Field label="动态变量" hint="批量导出时按每张图解析">
+          <div className="token-list">
+            {TEXT_TOKENS.map((item) => (
+              <button
+                key={item.token}
+                type="button"
+                className="token token-button"
+                title={item.label}
+                onClick={() =>
+                  applyTextPatch(
+                    layer.id,
+                    { text: `${layer.text}${layer.text ? ' ' : ''}${item.token}` },
+                    `text-${layer.id}`,
+                  )
+                }
+              >
+                {item.token}
+              </button>
+            ))}
+          </div>
+        </Field>
       </PanelSection>
 
       <PanelSection title="排版">
@@ -348,6 +379,152 @@ function TextStyle({ layer }: { layer: TextLayer }) {
       </PanelSection>
 
       <CommonSection layer={layer} />
+    </>
+  );
+}
+
+function RedactStyle({ layer }: { layer: RedactLayer }) {
+  const updateLayer = useEditor((state) => state.updateLayer);
+  const updateRedactRegion = useEditor((state) => state.updateRedactRegion);
+  const removeRedactRegion = useEditor((state) => state.removeRedactRegion);
+
+  return (
+    <>
+      <PanelSection title="打码方式">
+        <Field label="模式">
+          <Segmented<RedactMode>
+            value={layer.mode}
+            ariaLabel="打码模式"
+            options={[
+              { value: 'mosaic', label: '马赛克' },
+              { value: 'blur', label: '模糊' },
+              { value: 'solid', label: '纯色' },
+            ]}
+            onChange={(value) => updateLayer(layer.id, { mode: value })}
+          />
+        </Field>
+        {layer.mode === 'mosaic' ? (
+          <Slider
+            label="色块大小"
+            hint="相对图片短边"
+            value={layer.blockSize}
+            min={0.004}
+            max={0.08}
+            step={0.002}
+            format={(value) => pct(value, 1)}
+            onChange={(value) => updateLayer(layer.id, { blockSize: value }, `block-${layer.id}`)}
+          />
+        ) : null}
+        {layer.mode === 'blur' ? (
+          <Slider
+            label="模糊半径"
+            value={layer.blurRadius}
+            min={0.006}
+            max={0.08}
+            step={0.002}
+            format={(value) => pct(value, 1)}
+            onChange={(value) => updateLayer(layer.id, { blurRadius: value }, `blur-${layer.id}`)}
+          />
+        ) : null}
+        {layer.mode === 'solid' ? (
+          <>
+            <Field label="填充色">
+              <ColorField
+                label="填充色"
+                value={layer.color}
+                onChange={(value) => updateLayer(layer.id, { color: value }, `color-${layer.id}`)}
+              />
+            </Field>
+            <Slider
+              label="不透明度"
+              value={layer.opacity}
+              min={0.2}
+              max={1}
+              step={0.02}
+              format={(value) => pct(value)}
+              onChange={(value) => updateLayer(layer.id, { opacity: value }, `opacity-${layer.id}`)}
+            />
+          </>
+        ) : null}
+        <Slider
+          label="圆角"
+          value={layer.radius}
+          min={0}
+          max={0.06}
+          step={0.002}
+          format={(value) => pct(value, 1)}
+          onChange={(value) => updateLayer(layer.id, { radius: value }, `radius-${layer.id}`)}
+        />
+        <Hint>
+          打码始终绘制在文字 / Logo 之前，水印不会盖住打码区域；导出时按原始像素重新计算，不会因为缩放而失效。
+        </Hint>
+      </PanelSection>
+
+      <PanelSection title="打码区域" hint={`${layer.regions.length} 个`}>
+        {layer.regions.length === 0 ? (
+          <Hint>在左侧画布上按住拖动，框选出需要打码的区域。</Hint>
+        ) : (
+          <div className="region-list">
+            {layer.regions.map((region, index) => (
+              <div className="region-row" key={region.id}>
+                <span className="region-index">{index + 1}</span>
+                <span className="region-meta">
+                  {Math.round(region.x * 100)},{Math.round(region.y * 100)} ·{' '}
+                  {Math.round(region.w * 100)}×{Math.round(region.h * 100)}
+                </span>
+                <div className="region-nudge">
+                  <button
+                    type="button"
+                    title="上移"
+                    onClick={() =>
+                      updateRedactRegion(layer.id, region.id, {
+                        y: Math.max(0, region.y - 0.01),
+                      })
+                    }
+                  >
+                    ↑
+                  </button>
+                  <button
+                    type="button"
+                    title="下移"
+                    onClick={() =>
+                      updateRedactRegion(layer.id, region.id, {
+                        y: Math.min(1 - region.h, region.y + 0.01),
+                      })
+                    }
+                  >
+                    ↓
+                  </button>
+                </div>
+                <button
+                  type="button"
+                  className="icon-mini"
+                  title="删除区域"
+                  onClick={() => removeRedactRegion(layer.id, region.id)}
+                >
+                  ×
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+        <Hint>画布上拖动空白处可新增区域；拖动方框移动，右下角手柄缩放。</Hint>
+      </PanelSection>
+
+      <PanelSection title="图层名称">
+        <Field label="名称">
+          <input
+            className="input"
+            value={layer.name}
+            onChange={(event) => updateLayer(layer.id, { name: event.target.value }, `name-${layer.id}`)}
+          />
+        </Field>
+        <SwitchRow
+          label="显示该打码图层"
+          checked={layer.visible}
+          onChange={(value) => updateLayer(layer.id, { visible: value })}
+        />
+      </PanelSection>
     </>
   );
 }

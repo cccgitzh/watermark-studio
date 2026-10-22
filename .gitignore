@@ -2,6 +2,7 @@ node_modules
 dist
 dist-ssr
 coverage
+tests/e2e/.artifacts
 *.local
 .DS_Store
 .vscode/*

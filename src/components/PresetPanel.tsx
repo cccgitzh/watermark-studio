@@ -168,6 +168,9 @@ export function PresetPanel() {
 function describePreset(preset: Preset): string {
   const layer = preset.layers[0];
   if (!layer) return '空方案';
+  if (layer.type === 'redact') {
+    return `${preset.layers.length} 图层 · 打码 ${layer.regions.length} 区域`;
+  }
   const mode =
     layer.layout.mode === 'tile' ? '平铺' : layer.layout.mode === 'grid' ? '网格' : '单点';
   return `${preset.layers.length} 图层 · ${mode} · ${Math.round(layer.opacity * 100)}%`;
