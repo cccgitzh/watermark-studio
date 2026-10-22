@@ -12,3 +12,6 @@ coverage
 .env.*
 !.env.example
 .ai-memory/
+
+# EdgeOne CLI 构建缓存
+.edgeone
