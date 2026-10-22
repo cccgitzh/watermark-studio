@@ -43,7 +43,7 @@ export function LayersPanel() {
       <div className="panel-head">
         <span className="panel-title">图层</span>
         <div className="spacer" />
-        <span style={{ fontSize: 10.5, color: 'var(--muted)', fontFamily: 'var(--font-mono)' }}>
+        <span className="panel-count">
           {layers.length}/{MAX_LAYERS}
         </span>
       </div>

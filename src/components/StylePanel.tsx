@@ -139,7 +139,7 @@ function TextStyle({ layer }: { layer: TextLayer }) {
         />
         <Hint>自定义字体只保存在当前浏览器会话中，不会写入方案文件。</Hint>
         <Field label="动态变量" hint="批量导出时按每张图解析">
-          <div className="token-list">
+          <div className="token-list token-grid">
             {TEXT_TOKENS.map((item) => (
               <button
                 key={item.token}

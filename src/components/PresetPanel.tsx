@@ -66,16 +66,18 @@ export function PresetPanel() {
   return (
     <>
       <PanelSection title="内置方案" hint={`${builtin.length} 个`}>
-        <div className="preset-grid">
+        <div className="preset-list">
           {builtin.map((preset) => (
             <button
               key={preset.id}
               type="button"
-              className="preset-card"
+              className="preset-row"
               onClick={() => applyPreset(preset)}
             >
-              <span className="preset-name">{preset.name}</span>
-              <span className="preset-meta">{describePreset(preset)}</span>
+              <span className="preset-text">
+                <span className="preset-name">{preset.name}</span>
+                <span className="preset-meta">{describePreset(preset)}</span>
+              </span>
             </button>
           ))}
         </div>
@@ -83,16 +85,14 @@ export function PresetPanel() {
 
       <PanelSection title="我的方案" hint={custom.length ? `${custom.length} 个` : '暂无'}>
         {custom.length ? (
-          <div className="preset-grid">
+          <div className="preset-list">
             {custom.map((preset) => (
-              <div key={preset.id} className="preset-card" style={{ cursor: 'default' }}>
-                <button
-                  type="button"
-                  style={{ all: 'unset', cursor: 'pointer', display: 'block' }}
-                  onClick={() => applyPreset(preset)}
-                >
-                  <span className="preset-name">{preset.name}</span>
-                  <span className="preset-meta">{describePreset(preset)}</span>
+              <div key={preset.id} className="preset-row preset-row-static">
+                <button type="button" className="preset-apply" onClick={() => applyPreset(preset)}>
+                  <span className="preset-text">
+                    <span className="preset-name">{preset.name}</span>
+                    <span className="preset-meta">{describePreset(preset)}</span>
+                  </span>
                 </button>
                 <button
                   type="button"
@@ -100,7 +100,7 @@ export function PresetPanel() {
                   title="删除方案"
                   onClick={() => deletePreset(preset.id)}
                 >
-                  <IconTrash size={11} />
+                  <IconTrash size={12} />
                 </button>
               </div>
             ))}

@@ -5,6 +5,7 @@ import { Inspector } from './components/Inspector';
 import { LayersPanel } from './components/LayersPanel';
 import { PreviewStage } from './components/PreviewStage';
 import { ProgressOverlay } from './components/ProgressOverlay';
+import { SheetHead } from './components/SheetHead';
 import { ToastHost } from './components/ToastHost';
 import { TopBar } from './components/TopBar';
 import { IconUpload } from './components/icons';
@@ -63,10 +64,15 @@ export default function App() {
   return (
     <div className="app">
       <TopBar />
-      <div className="workspace">
+      <div className="frame">
         <LayersPanel />
-        <PreviewStage />
-        <Inspector />
+        <main className="sheet">
+          <SheetHead />
+          <div className="sheet-body">
+            <PreviewStage />
+            <Inspector />
+          </div>
+        </main>
       </div>
       {dropping ? (
         <div className="drop-overlay">

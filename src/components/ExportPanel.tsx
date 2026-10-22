@@ -91,7 +91,7 @@ export function ExportPanel() {
             />
           </Field>
         ) : null}
-        <Hint>PNG 保留透明通道，JPEG 体积最小，WebP 在体积与质量间更均衡。</Hint>
+        <Hint>PNG 保留透明，JPEG 体积最小，WebP 兼顾两者。</Hint>
       </PanelSection>
 
       <PanelSection title="文件命名">
@@ -115,30 +115,21 @@ export function ExportPanel() {
       </PanelSection>
 
       <PanelSection title="导出">
-        <div className="stat-grid">
-          <div className="stat">
-            <div className="stat-label">待处理</div>
-            <div className="stat-value">{pending.length} 张</div>
-          </div>
-          <div className="stat">
-            <div className="stat-label">输出</div>
-            <div className="stat-value">{ext.toUpperCase()}</div>
-          </div>
-          <div className="stat">
-            <div className="stat-label">当前尺寸</div>
-            <div className="stat-value">
-              {outputSize ? `${outputSize.width}×${outputSize.height}` : '—'}
-            </div>
-          </div>
-          <div className="stat">
-            <div className="stat-label">队列总量</div>
-            <div className="stat-value">{images.length} 张</div>
-          </div>
+        <div className="export-facts">
+          <span>
+            <b className="num">{pending.length}</b> 张待处理
+          </span>
+          <span className="dot" aria-hidden="true" />
+          <span>{ext.toUpperCase()}</span>
+          <span className="dot" aria-hidden="true" />
+          <span className="num">
+            {outputSize ? `${outputSize.width} × ${outputSize.height}` : '—'}
+          </span>
         </div>
 
         <button
           type="button"
-          className="button button-primary button-block"
+          className="button button-block"
           disabled={!pending.length}
           onClick={() => void runBatch('zip')}
         >

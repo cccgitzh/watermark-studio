@@ -7,7 +7,6 @@ import { useLogoImages } from '../hooks/useLogoImages';
 import { useEditor } from '../state/editorStore';
 import { DropZone } from './DropZone';
 import { Filmstrip } from './Filmstrip';
-import { IconCompare, IconRedact } from './icons';
 
 type RegionDrag =
   | { kind: 'move' | 'resize'; id: string; startX: number; startY: number; origin: RedactRegion }
@@ -23,7 +22,6 @@ export function PreviewStage() {
   );
   const layers = useEditor((state) => state.layers);
   const comparing = useEditor((state) => state.comparing);
-  const setComparing = useEditor((state) => state.setComparing);
   const selectedId = useEditor((state) => state.selectedId);
   const updateLayout = useEditor((state) => state.updateLayout);
   const addRedactRegion = useEditor((state) => state.addRedactRegion);
@@ -68,8 +66,8 @@ export function PreviewStage() {
     if (!wrap || !activeImage) return;
 
     const measure = () => {
-      const availableW = wrap.clientWidth;
-      const availableH = wrap.clientHeight;
+      const availableW = wrap.clientWidth - 24;
+      const availableH = wrap.clientHeight - 24;
       if (!availableW || !availableH) return;
       const ratio = Math.min(availableW / activeImage.width, availableH / activeImage.height);
       setDisplay({
@@ -289,57 +287,13 @@ export function PreviewStage() {
     .join(' ');
 
   const overlayRegions = redactLayer ? redactLayer.regions : [];
-  const showDraft = Boolean(draft);
-  const hintText = redactLayer
-    ? '拖动框选打码区域 · 拖动方框移动 · 右下角缩放'
-    : '拖动可直接调整水印位置 · 方向键微调';
+  const hintText = redactLayer ? '拖动框选区域 · 方框可移动缩放' : '拖动移动 · 方向键微调';
 
   return (
     <section className="stage">
-      <div className="stage-bar">
+      <div className="stage-well" ref={wrapRef}>
         {activeImage ? (
-          <>
-            <div className="stage-file">
-              <span>{activeImage.name}</span>
-            </div>
-            <span className="stage-dim">
-              {activeImage.width} × {activeImage.height}
-            </span>
-            <span className="stage-dim">{formatBytes(activeImage.size)}</span>
-            <span className="stage-dim">{activeImage.mime.replace('image/', '').toUpperCase()}</span>
-            <div className="spacer" />
-            <label className="button button-sm button-ghost" style={{ cursor: 'pointer' }}>
-              添加图片
-              <input
-                type="file"
-                accept="image/*"
-                multiple
-                hidden
-                onChange={(event) => {
-                  const files = Array.from(event.target.files ?? []);
-                  event.target.value = '';
-                  if (files.length) void useEditor.getState().addImages(files);
-                }}
-              />
-            </label>
-            <button
-              type="button"
-              className={comparing ? 'button button-sm' : 'button button-sm button-ghost'}
-              onClick={() => setComparing(!comparing)}
-              title="按住空格也可临时对比"
-            >
-              <IconCompare size={14} />
-              {comparing ? '返回水印' : '对比原图'}
-            </button>
-          </>
-        ) : (
-          <span style={{ color: 'var(--muted)' }}>尚未载入图片</span>
-        )}
-      </div>
-
-      <div className="stage-canvas-wrap" ref={wrapRef}>
-        {activeImage ? (
-          <div className="canvas-shell">
+          <figure className="print">
             <canvas
               ref={canvasRef}
               className={canvasClass}
@@ -406,17 +360,27 @@ export function PreviewStage() {
             ) : null}
 
             {comparing ? <div className="compare-tag">原图预览</div> : null}
-            {(canDrawRegion || canDragStage) && !regionDrag && !stageDragging && !showDraft ? (
-              <div className="drag-badge">
-                {redactLayer ? <IconRedact size={12} /> : null}
-                {hintText}
-              </div>
-            ) : null}
-          </div>
+          </figure>
         ) : (
           <DropZone />
         )}
       </div>
+
+      {activeImage ? (
+        <div className="stage-meta">
+          <span className="stage-meta-name">{activeImage.name}</span>
+          {canDrawRegion || canDragStage ? (
+            <span className="stage-hint">{hintText}</span>
+          ) : null}
+          <span className="stage-meta-figures">
+            <span className="num">{activeImage.width} × {activeImage.height}</span>
+            <span className="dot" aria-hidden="true" />
+            <span className="num">{formatBytes(activeImage.size)}</span>
+            <span className="dot" aria-hidden="true" />
+            <span>{activeImage.mime.replace('image/', '').toUpperCase()}</span>
+          </span>
+        </div>
+      ) : null}
 
       {images.length > 0 ? (
         <Filmstrip />

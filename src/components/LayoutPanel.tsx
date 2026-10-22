@@ -241,8 +241,7 @@ export function LayoutPanel({ layer }: { layer: WatermarkLayer | null }) {
 
       <PanelSection title="图层顺序">
         <Field
-          label={`当前在第 ${layers.findIndex((item) => item.id === layer.id) + 1} 层`}
-          hint={`共 ${layers.length} 层`}
+          label={`第 ${layers.findIndex((item) => item.id === layer.id) + 1} 层，共 ${layers.length} 层`}
         >
           <div className="button-row">
             <button

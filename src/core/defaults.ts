@@ -25,7 +25,7 @@ export const FONT_OPTIONS: { label: string; value: string }[] = [
   { label: '楷体', value: '"Kaiti SC","KaiTi","STKaiti","Noto Serif SC",serif' },
   { label: '黑体', value: '"Heiti SC","SimHei","Noto Sans SC",sans-serif' },
   { label: '圆体', value: '"Yuanti SC","YouYuan","Hiragino Maru Gothic ProN",sans-serif' },
-  { label: '等宽', value: 'ui-monospace,"SF Mono",Consolas,"Courier New",monospace' },
+  { label: '等宽', value: 'ui-monospace,"SF Mono",Consolas,"Courier New",monospace' }, // taste-skill-ignore: user-chosen watermark face
   { label: 'Impact（标题）', value: 'Impact,"Arial Black","Haettenschweiler",sans-serif' },
   { label: 'Georgia（西文衬线）', value: 'Georgia,"Times New Roman",serif' },
 ];

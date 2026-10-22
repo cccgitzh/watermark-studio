@@ -32,32 +32,12 @@ export function Filmstrip() {
   const addImages = useEditor((state) => state.addImages);
   const importsBusy = useEditor((state) => state.importsBusy);
   const activeIndex = images.findIndex((item) => item.id === activeImageId);
-  const enabled = images.filter((item) => !item.skipped).length;
 
   return (
     <div className="filmstrip">
       <div className="filmstrip-head">
-        <span>
-          队列 <b style={{ color: 'var(--ink)' }}>{images.length}</b> 张 · 待处理{' '}
-          <b style={{ color: 'var(--ink)' }}>{enabled}</b> 张
-          {importsBusy ? ' · 正在读取…' : ''}
-        </span>
+        <span>图片顺序{importsBusy ? ' · 正在读取' : ''}</span>
         <div className="spacer" />
-        <label className="button button-sm" style={{ cursor: 'pointer' }}>
-          <IconPlus size={13} />
-          添加图片
-          <input
-            type="file"
-            accept="image/*"
-            multiple
-            hidden
-            onChange={(event) => {
-              const files = Array.from(event.target.files ?? []);
-              event.target.value = '';
-              if (files.length) void addImages(files);
-            }}
-          />
-        </label>
         <button
           type="button"
           className="icon-mini"

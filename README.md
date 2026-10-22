@@ -8,14 +8,14 @@
 
 **在线试用**：<https://watermark-studio.edgeone.cool> · **代码**：<https://github.com/cccgitzh/watermark-studio>
 
-![编辑器界面](docs/screenshots/editor-light.png)
+![编辑器界面](docs/screenshots/editor-light.jpg)
 
 <details>
 <summary>更多截图（打码 / 标签条样式 / 深色主题 / 移动端）</summary>
 
 | 区域打码（马赛克） | 标签条 + 描边 | 深色主题 | 移动端 390px |
 | --- | --- | --- | --- |
-| ![](docs/screenshots/redact.png) | ![](docs/screenshots/label-chip.png) | ![](docs/screenshots/editor-dark.png) | ![](docs/screenshots/mobile.png) |
+| ![](docs/screenshots/redact.jpg) | ![](docs/screenshots/label-chip.jpg) | ![](docs/screenshots/editor-dark.jpg) | ![](docs/screenshots/mobile.jpg) |
 
 </details>
 
@@ -108,6 +108,20 @@ npm run typecheck  # 仅类型检查
 
 ---
 
+## 界面与设计规范
+
+界面按 **打样台** 组织：一层石灰底色外框承载顶栏与图层面板，工作区是一张内嵌 8px、16px 圆角、1px 边的白色纸张；照片像打样稿一样带白色留白放在凹下的台面上，说明行是它的标签，胶卷条是接触印相。色彩只用于选择与状态，主操作是近黑色按钮。
+
+- **设计变量**：`src/styles/tokens.css` —— 表面（外框 / 纸张 / 台面 / 分组）、线条（边 / 分隔 / 控件）、墨色三档、状态色、字号、圆角、间距，浅色与深色两套
+- **字体**：IBM Plex Sans 可变字重（latin 子集，自托管于 `public/fonts/`，OFL 1.1）+ IBM Plex Mono（仅尺寸、坐标、计数等数字）；中文回落系统黑体，零外部请求
+- **字号**：22 / 16 / 14 / 13 / 12 / 11 六级 —— 标题 22，正文 14，标签与控件 13，元信息 12，徽标 11（下限）
+- **圆角**：纸张 16 / 面板 8 / 控件 6 / 徽标 4；**阴影**只给浮层（toast、进度对话框、拖拽提示），静置元素一律 1px 边或换底色
+- **对齐**：外框 8px 内缩，纸张内 20px 边距，检查器 16px 边距；顶栏 48px、页签 40px、控件 30px、图层行 34px、缩略图 64×48
+- **状态**：hover 换底色、focus 用 accent 2px 外环、disabled 45% 透明度、选中图层用中性灰填充（不用描边，避免与焦点混淆）
+- **断点**：≥1240 三栏（228 / 自适应 / 340）；≤1240 收窄为 208 / 320；≤980 外框折叠 —— 图层变横向条、属性面板下移、纸张铺满；≤640 单列、操作换行、触控目标 ≥36px
+
+字体许可：`public/fonts/OFL.txt`。
+
 ## 项目结构
 
 ```
@@ -140,7 +154,8 @@ watermark-studio/
 │   │   ├── StylePanel.tsx  LayoutPanel.tsx  ExportPanel.tsx  PresetPanel.tsx
 │   │   ├── controls.tsx         # 表单原语（滑杆 / 分段 / 开关 / 取色 / 九宫格）
 │   │   ├── DropZone.tsx  ToastHost.tsx  ProgressOverlay.tsx  icons.tsx
-│   ├── styles/                  # tokens.css（设计变量）/ base.css / panels.css
+│   ├── styles/                  # fonts.css（自托管字体）/ tokens.css（设计变量）
+│   │                            # base.css（外壳与画布）/ panels.css（检查器与控件）
 │   ├── App.tsx  main.tsx
 ├── tests/                       # 35 个单测：断行 / 几何 / 命名 / 变量
 │   └── e2e/                     # Playwright 冒烟：导入 → 编辑 → 打码 → 导出（32 断言）

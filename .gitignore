@@ -16,3 +16,6 @@ tests/e2e/.artifacts
 
 # EdgeOne CLI 构建缓存
 .edgeone
+
+# design-taste-frontend 工作目录
+.taste-skill

@@ -101,15 +101,12 @@ try {
   await page.waitForSelector('canvas.preview-canvas', { timeout: 15000 });
   await page.waitForTimeout(500);
   check('首张图片上传成功', (await page.locator('.thumb:not(.thumb-add)').count()) === 1);
-  check(
-    '识别真实尺寸',
-    (await page.locator('.stage-dim').first().innerText()).includes('640'),
-    await page.locator('.stage-dim').first().innerText(),
-  );
+  const meta = await page.locator('.stage-meta').innerText();
+  check('相纸说明行显示尺寸与格式', meta.includes('640') && meta.includes('400'), meta.replace(/\n/g, ' '));
 
   // 3. 回归：上传后仍可继续添加图片（此前无入口）
-  check('胶片条出现「添加图片」入口', await page.locator('.filmstrip-head label.button').isVisible());
-  await page.setInputFiles('.filmstrip-head input[type="file"]', [fixture('photo.png')]);
+  check('纸张抬头出现「添加图片」入口', await page.locator('.sheet-actions .button').first().isVisible());
+  await page.setInputFiles('.sheet-actions input[type="file"]', [fixture('photo.png')]);
   await page.waitForTimeout(600);
   check('通过队列入口追加第二张', (await page.locator('.thumb:not(.thumb-add)').count()) === 2);
   check('缩略图末尾有「+ 添加」格子', await page.locator('.thumb-add').isVisible());

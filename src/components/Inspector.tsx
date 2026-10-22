@@ -1,11 +1,9 @@
 import { useState } from 'react';
-import { layerKindLabel } from '../core/layers';
 import { useEditor } from '../state/editorStore';
 import { ExportPanel } from './ExportPanel';
 import { LayoutPanel } from './LayoutPanel';
 import { PresetPanel } from './PresetPanel';
 import { StylePanel } from './StylePanel';
-import { IconLayers, IconSparkle } from './icons';
 
 type TabKey = 'style' | 'layout' | 'export' | 'preset';
 
@@ -37,28 +35,6 @@ export function Inspector() {
             {item.label}
           </button>
         ))}
-      </div>
-
-      <div className="panel-head" style={{ height: 38 }}>
-        <span className="panel-title" style={{ fontSize: 10.5 }}>
-          {tab === 'style'
-            ? layer
-              ? layer.name
-              : '未选择图层'
-            : tab === 'layout'
-              ? '排布与定位'
-              : tab === 'export'
-                ? '导出设置'
-                : '方案库'}
-        </span>
-        <div className="spacer" />
-        {tab === 'style' && layer ? (
-          <span style={{ fontSize: 10.5, color: 'var(--muted)' }}>
-            {layerKindLabel(layer)}图层
-          </span>
-        ) : null}
-        {tab === 'preset' ? <IconSparkle size={13} style={{ color: 'var(--muted)' }} /> : null}
-        {tab === 'layout' ? <IconLayers size={13} style={{ color: 'var(--muted)' }} /> : null}
       </div>
 
       <div className="panel-scroll">

@@ -1,76 +1,131 @@
+/* ============================================================
+   Design tokens — "打样台" (proofing table)
+   Style dealt: framed-sheet (seed 1097521839)
+   One tinted frame holds the chrome; the work sits on a white sheet.
+   Colour is reserved for selection marks and status, never for chrome.
+   ============================================================ */
+
 :root {
   color-scheme: light;
 
-  --paper: #f2efe7;
-  --paper-deep: #eae6db;
-  --panel: #fffdf8;
-  --panel-soft: #faf7ef;
-  --panel-sunken: #f5f1e7;
+  /* surfaces */
+  --frame: #eef0ef;
+  --frame-hover: #e6e9e8;
+  --sheet: #ffffff;
+  --well: #e7eae9;
+  --raised: #f5f7f6;
+  --hover: #f2f4f3;
+  --active: #e4e7e6;
+  --matte: #ffffff;
 
-  --ink: #1a1813;
-  --ink-2: #45403a;
-  --muted: #857e6f;
-  --muted-2: #9d968a;
+  /* lines */
+  --border: #e4e7e6;
+  --rule: #eef0ef;
+  --control: #cfd3d2;
 
-  --line: #e3ddcc;
-  --line-strong: #cfc7b2;
+  /* ink */
+  --text: #14171a;
+  --muted: #5b6164;
+  --faint: #6d7376;
+  --on-dark: #f6f7f6;
 
-  --accent: #a8382b;
-  --accent-hover: #8f2c21;
-  --accent-press: #7a241b;
-  --accent-soft: #f7e6e2;
-  --accent-contrast: #fff9f6;
+  /* the one hue: selection marks and data */
+  --accent: #1b6c80;
+  --accent-soft: #e7f0f2;
 
-  --ok: #2e6b4f;
-  --ok-soft: #e4efe7;
-  --warn: #8a6410;
-  --stage: #ded9ca;
-  --stage-grid: rgba(90, 79, 58, 0.09);
+  /* action */
+  --primary: #16191c;
+  --primary-hover: #2a2e32;
+  --primary-ink: #ffffff;
 
-  --radius-lg: 12px;
-  --radius: 9px;
-  --radius-sm: 6px;
+  /* status */
+  --positive: #1e7b4f;
+  --negative: #b3261e;
+  --warning: #8a5a00;
+  --pill-positive-bg: #dcfae5;
+  --pill-positive-ink: #04250e;
+  --pill-negative-bg: #ffedea;
+  --pill-negative-ink: #831c1e;
+  --pill-warning-bg: #fffbeb;
+  --pill-warning-ink: #92400e;
+  --pill-neutral-bg: #ebedee;
+  --pill-neutral-ink: #353736;
 
-  --shadow-sm: 0 1px 1px rgba(47, 39, 24, 0.05), 0 2px 6px -3px rgba(47, 39, 24, 0.14);
-  --shadow-md: 0 12px 30px -18px rgba(47, 39, 24, 0.45), 0 2px 8px -4px rgba(47, 39, 24, 0.16);
-  --shadow-pop: 0 24px 60px -24px rgba(37, 30, 18, 0.5);
+  /* type */
+  --font-ui: 'IBM Plex Sans', 'PingFang SC', 'HarmonyOS Sans SC', 'Microsoft YaHei',
+    system-ui, sans-serif;
+  --font-figures: 'IBM Plex Mono', ui-monospace, 'SF Mono', Consolas, monospace; /* taste-skill-ignore: figures only */
 
-  --font-ui: 'Inter', 'PingFang SC', 'HarmonyOS Sans SC', 'Microsoft YaHei', system-ui, sans-serif;
-  --font-mono: ui-monospace, 'SF Mono', 'JetBrains Mono', Consolas, monospace;
+  --fs-title: 22px;
+  --fs-lead: 16px;
+  --fs-body: 14px;
+  --fs-dense: 13px;
+  --fs-label: 13px;
+  --fs-meta: 12px;
+  --fs-tiny: 11px;
+
+  /* geometry */
+  --radius-sheet: 16px;
+  --radius-panel: 8px;
+  --radius-control: 6px;
+  --radius-chip: 4px;
+
+  --sheet-inset: 8px;
+  --rail-width: 228px;
+  --inspector-width: 340px;
+  --topbar-height: 48px;
+  --control-height: 30px;
+  --row-height: 34px;
+
+  --gap: 12px;
+  --pad-sheet: 20px;
+  --pad-panel: 16px;
 
   --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+
+  /* the only shadows in the app: things that float */
+  --shadow-float: 0 12px 32px -16px rgba(20, 23, 26, 0.28), 0 2px 8px -4px rgba(20, 23, 26, 0.12);
 }
 
-[data-theme='dark'] {
+:root[data-theme='dark'] {
   color-scheme: dark;
 
-  --paper: #121110;
-  --paper-deep: #0d0c0b;
-  --panel: #1b1a17;
-  --panel-soft: #211f1b;
-  --panel-sunken: #171614;
+  --frame: #0c0d0d;
+  --frame-hover: #161919;
+  --sheet: #17191a;
+  --well: #0b0c0c;
+  --raised: #1b1e1f;
+  --hover: #1e2223;
+  --active: #24282a;
+  --matte: #202324;
 
-  --ink: #f1ede3;
-  --ink-2: #c8c2b4;
-  --muted: #918a7c;
-  --muted-2: #7c7669;
+  --border: #262a2b;
+  --rule: #1e2122;
+  --control: #3b4142;
 
-  --line: #2f2c26;
-  --line-strong: #423e35;
+  --text: #f3f5f4;
+  --muted: #b6bbba;
+  --faint: #9aa09f;
+  --on-dark: #0c0d0d;
 
-  --accent: #d96255;
-  --accent-hover: #e4766a;
-  --accent-press: #c15145;
-  --accent-soft: #33211d;
-  --accent-contrast: #1a0f0c;
+  --accent: #4fa8bc;
+  --accent-soft: #12262b;
 
-  --ok: #6fbf95;
-  --ok-soft: #1e2b24;
-  --warn: #d6a54a;
-  --stage: #0e0d0c;
-  --stage-grid: rgba(255, 250, 235, 0.06);
+  --primary: #ffffff;
+  --primary-hover: #e6e8e7;
+  --primary-ink: #0c0d0d;
 
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
-  --shadow-md: 0 14px 34px -20px rgba(0, 0, 0, 0.9), 0 2px 8px -4px rgba(0, 0, 0, 0.5);
-  --shadow-pop: 0 30px 70px -30px rgba(0, 0, 0, 0.95);
+  --positive: #3fc07a;
+  --negative: #e2685f;
+  --warning: #d6a54a;
+  --pill-positive-bg: #172a1d;
+  --pill-positive-ink: #3fc07a;
+  --pill-negative-bg: #2c1a20;
+  --pill-negative-ink: #e5566f;
+  --pill-warning-bg: #2a2216;
+  --pill-warning-ink: #d6a54a;
+  --pill-neutral-bg: #232727;
+  --pill-neutral-ink: #c3c8c7;
+
+  --shadow-float: 0 16px 40px -18px rgba(0, 0, 0, 0.8), 0 2px 10px -4px rgba(0, 0, 0, 0.6);
 }
