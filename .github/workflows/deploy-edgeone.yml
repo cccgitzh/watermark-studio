@@ -1,0 +1,51 @@
+name: Deploy to EdgeOne Makers
+
+# 需要两个仓库配置：
+#   Secret  EDGEONE_API_TOKEN  —— EdgeOne Makers 的 API Token
+#   Variable EDGEONE_PROJECT_NAME（可选，默认 watermark-studio）
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: Build & deploy
+    runs-on: ubuntu-latest
+    env:
+      EDGEONE_PROJECT_NAME: ${{ vars.EDGEONE_PROJECT_NAME || 'watermark-studio' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Verify
+        run: npm run typecheck && npm test
+
+      - name: Install EdgeOne CLI
+        run: npm i -g edgeone@latest
+
+      - name: Deploy
+        env:
+          EDGEONE_API_TOKEN: ${{ secrets.EDGEONE_API_TOKEN }}
+          PAGES_SOURCE: skills
+        run: |
+          if [ -z "$EDGEONE_API_TOKEN" ]; then
+            echo "::error::缺少 EDGEONE_API_TOKEN，请在仓库 Secrets 中配置后再运行"
+            exit 1
+          fi
+          # CLI 会自动识别 Vite 项目并执行 npm run build，上传 dist/
+          edgeone makers deploy -n "$EDGEONE_PROJECT_NAME" -t "$EDGEONE_API_TOKEN" --json | tee deploy.json
+          node -e "const r=require('./deploy.json');console.log('URL:', r.url);require('fs').appendFileSync(process.env.GITHUB_STEP_SUMMARY, '### EdgeOne\n'+r.url+'\n')"

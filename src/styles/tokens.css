@@ -1,0 +1,76 @@
+:root {
+  color-scheme: light;
+
+  --paper: #f2efe7;
+  --paper-deep: #eae6db;
+  --panel: #fffdf8;
+  --panel-soft: #faf7ef;
+  --panel-sunken: #f5f1e7;
+
+  --ink: #1a1813;
+  --ink-2: #45403a;
+  --muted: #857e6f;
+  --muted-2: #9d968a;
+
+  --line: #e3ddcc;
+  --line-strong: #cfc7b2;
+
+  --accent: #a8382b;
+  --accent-hover: #8f2c21;
+  --accent-press: #7a241b;
+  --accent-soft: #f7e6e2;
+  --accent-contrast: #fff9f6;
+
+  --ok: #2e6b4f;
+  --ok-soft: #e4efe7;
+  --warn: #8a6410;
+  --stage: #ded9ca;
+  --stage-grid: rgba(90, 79, 58, 0.09);
+
+  --radius-lg: 12px;
+  --radius: 9px;
+  --radius-sm: 6px;
+
+  --shadow-sm: 0 1px 1px rgba(47, 39, 24, 0.05), 0 2px 6px -3px rgba(47, 39, 24, 0.14);
+  --shadow-md: 0 12px 30px -18px rgba(47, 39, 24, 0.45), 0 2px 8px -4px rgba(47, 39, 24, 0.16);
+  --shadow-pop: 0 24px 60px -24px rgba(37, 30, 18, 0.5);
+
+  --font-ui: 'Inter', 'PingFang SC', 'HarmonyOS Sans SC', 'Microsoft YaHei', system-ui, sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', 'JetBrains Mono', Consolas, monospace;
+
+  --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+[data-theme='dark'] {
+  color-scheme: dark;
+
+  --paper: #121110;
+  --paper-deep: #0d0c0b;
+  --panel: #1b1a17;
+  --panel-soft: #211f1b;
+  --panel-sunken: #171614;
+
+  --ink: #f1ede3;
+  --ink-2: #c8c2b4;
+  --muted: #918a7c;
+  --muted-2: #7c7669;
+
+  --line: #2f2c26;
+  --line-strong: #423e35;
+
+  --accent: #d96255;
+  --accent-hover: #e4766a;
+  --accent-press: #c15145;
+  --accent-soft: #33211d;
+  --accent-contrast: #1a0f0c;
+
+  --ok: #6fbf95;
+  --ok-soft: #1e2b24;
+  --warn: #d6a54a;
+  --stage: #0e0d0c;
+  --stage-grid: rgba(255, 250, 235, 0.06);
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 14px 34px -20px rgba(0, 0, 0, 0.9), 0 2px 8px -4px rgba(0, 0, 0, 0.5);
+  --shadow-pop: 0 30px 70px -30px rgba(0, 0, 0, 0.95);
+}
