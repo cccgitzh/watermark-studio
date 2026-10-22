@@ -4,9 +4,11 @@ import { isLayoutLayer, isRedactLayer } from '../core/layers';
 import { renderComposite } from '../core/renderer';
 import type { RedactRegion } from '../core/types';
 import { useLogoImages } from '../hooks/useLogoImages';
+import { isReadyImage } from '../core/queue';
 import { useEditor } from '../state/editorStore';
 import { DropZone } from './DropZone';
 import { Filmstrip } from './Filmstrip';
+import { StageError, StageReading } from './StageStates';
 
 type RegionDrag =
   | { kind: 'move' | 'resize'; id: string; startX: number; startY: number; origin: RedactRegion }
@@ -27,7 +29,16 @@ export function PreviewStage() {
   const addRedactRegion = useEditor((state) => state.addRedactRegion);
   const updateRedactRegion = useEditor((state) => state.updateRedactRegion);
   const removeRedactRegion = useEditor((state) => state.removeRedactRegion);
+  const importProgress = useEditor((state) => state.importProgress);
+  const retryImage = useEditor((state) => state.retryImage);
+  const removeImage = useEditor((state) => state.removeImage);
+  const cancelImports = useEditor((state) => state.cancelImports);
+  const addImages = useEditor((state) => state.addImages);
   const logos = useLogoImages(layers);
+
+  const readyImage = activeImage && isReadyImage(activeImage) ? activeImage : null;
+  const failedImage = activeImage && activeImage.status === 'failed' ? activeImage : null;
+  const importing = importProgress !== null;
 
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -56,23 +67,23 @@ export function PreviewStage() {
 
   // 预览固定变量：当前图片名 + 第 1 张
   const previewVars = useMemo(
-    () => ({ fileName: activeImage?.name ?? '', index: 0, total: 1 }),
-    [activeImage?.name],
+    () => ({ fileName: readyImage?.name ?? '', index: 0, total: 1 }),
+    [readyImage?.name],
   );
 
   // 自适应容器尺寸
   useEffect(() => {
     const wrap = wrapRef.current;
-    if (!wrap || !activeImage) return;
+    if (!wrap || !readyImage) return;
 
     const measure = () => {
       const availableW = wrap.clientWidth - 24;
       const availableH = wrap.clientHeight - 24;
       if (!availableW || !availableH) return;
-      const ratio = Math.min(availableW / activeImage.width, availableH / activeImage.height);
+      const ratio = Math.min(availableW / readyImage.width, availableH / readyImage.height);
       setDisplay({
-        width: Math.max(1, Math.round(activeImage.width * ratio)),
-        height: Math.max(1, Math.round(activeImage.height * ratio)),
+        width: Math.max(1, Math.round(readyImage.width * ratio)),
+        height: Math.max(1, Math.round(readyImage.height * ratio)),
       });
     };
 
@@ -80,12 +91,12 @@ export function PreviewStage() {
     const observer = new ResizeObserver(measure);
     observer.observe(wrap);
     return () => observer.disconnect();
-  }, [activeImage]);
+  }, [readyImage]);
 
   // 绘制预览（限制在动画帧内，滑杆连续拖动不会堆积重绘）
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas || !activeImage || !display.width) return;
+    if (!canvas || !readyImage?.bitmap || !display.width) return;
 
     const frame = requestAnimationFrame(() => {
       const dpr = Math.min(2, window.devicePixelRatio || 1);
@@ -100,11 +111,11 @@ export function PreviewStage() {
       if (comparing) {
         ctx.setTransform(1, 0, 0, 1, 0, 0);
         ctx.clearRect(0, 0, backingW, backingH);
-        ctx.drawImage(activeImage.bitmap, 0, 0, backingW, backingH);
+        ctx.drawImage(readyImage.bitmap, 0, 0, backingW, backingH);
         return;
       }
 
-      renderComposite(ctx, activeImage.bitmap, {
+      renderComposite(ctx, readyImage.bitmap, {
         width: backingW,
         height: backingH,
         layers,
@@ -114,7 +125,7 @@ export function PreviewStage() {
     });
 
     return () => cancelAnimationFrame(frame);
-  }, [activeImage, display, layers, logos, comparing, previewVars]);
+  }, [readyImage, display, layers, logos, comparing, previewVars]);
 
   // 选中打码图层时默认选中第一个区域
   useEffect(() => {
@@ -292,7 +303,7 @@ export function PreviewStage() {
   return (
     <section className="stage">
       <div className="stage-well" ref={wrapRef}>
-        {activeImage ? (
+        {readyImage ? (
           <figure className="print">
             <canvas
               ref={canvasRef}
@@ -361,36 +372,41 @@ export function PreviewStage() {
 
             {comparing ? <div className="compare-tag">原图预览</div> : null}
           </figure>
+        ) : failedImage ? (
+          <StageError
+            item={failedImage}
+            onRetry={() => void retryImage(failedImage.id)}
+            onRemove={() => removeImage(failedImage.id)}
+            onFiles={(files) => void addImages(files)}
+          />
+        ) : importing ? (
+          <StageReading
+            done={importProgress.done}
+            total={importProgress.total}
+            onCancel={cancelImports}
+          />
         ) : (
           <DropZone />
         )}
       </div>
 
-      {activeImage ? (
+      {readyImage ? (
         <div className="stage-meta">
-          <span className="stage-meta-name">{activeImage.name}</span>
+          <span className="stage-meta-name">{readyImage.name}</span>
           {canDrawRegion || canDragStage ? (
             <span className="stage-hint">{hintText}</span>
           ) : null}
           <span className="stage-meta-figures">
-            <span className="num">{activeImage.width} × {activeImage.height}</span>
+            <span className="num">{readyImage.width} × {readyImage.height}</span>
             <span className="dot" aria-hidden="true" />
-            <span className="num">{formatBytes(activeImage.size)}</span>
+            <span className="num">{formatBytes(readyImage.size)}</span>
             <span className="dot" aria-hidden="true" />
-            <span>{activeImage.mime.replace('image/', '').toUpperCase()}</span>
+            <span>{readyImage.mime.replace('image/', '').toUpperCase()}</span>
           </span>
         </div>
       ) : null}
 
-      {images.length > 0 ? (
-        <Filmstrip />
-      ) : (
-        <div className="filmstrip">
-          <div className="filmstrip-head">
-            <span>图片队列为空 · 支持拖拽、粘贴或点击上传（最多 60 张）</span>
-          </div>
-        </div>
-      )}
+      {images.length > 0 || importing ? <Filmstrip /> : null}
     </section>
   );
 }

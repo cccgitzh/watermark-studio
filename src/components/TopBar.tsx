@@ -1,4 +1,5 @@
 import { runBatch } from '../features/batchExport';
+import { countPending } from '../core/queue';
 import { useEditor } from '../state/editorStore';
 import { IconDownload, IconMoon, IconRedo, IconSun, IconUndo } from './icons';
 
@@ -10,7 +11,7 @@ export function TopBar() {
   const redo = useEditor((state) => state.redo);
   const pastCount = useEditor((state) => state.pastCount);
   const futureCount = useEditor((state) => state.futureCount);
-  const pending = useEditor((state) => state.images.filter((item) => !item.skipped).length);
+  const pending = useEditor((state) => countPending(state.images));
 
   return (
     <header className="topbar">

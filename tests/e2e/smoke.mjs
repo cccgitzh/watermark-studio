@@ -78,8 +78,13 @@ const page = await context.newPage();
 const consoleErrors = [];
 const pageErrors = [];
 const external = [];
+/** 故意喂坏文件时，浏览器会为 <img> 解码失败记一条资源错误，属预期噪声 */
+let decoderNoiseUntil = 0;
 page.on('console', (msg) => {
-  if (msg.type() === 'error') consoleErrors.push(msg.text());
+  if (msg.type() !== 'error') return;
+  const text = msg.text();
+  if (Date.now() < decoderNoiseUntil && /Failed to load resource|ERR_FILE/i.test(text)) return;
+  consoleErrors.push(text);
 });
 page.on('pageerror', (err) => pageErrors.push(String(err)));
 page.on('request', (request) => {
@@ -144,7 +149,7 @@ try {
 
   // 6. 单点布局 + 画布拖拽 + 方向键微调
   await page.getByRole('tab', { name: '布局' }).click();
-  await page.getByRole('tab', { name: '单点' }).click();
+  await page.getByRole('radio', { name: '单点' }).click();
   await page.waitForTimeout(200);
   await page.getByRole('radio', { name: '右下' }).click();
   await page.waitForTimeout(250);
@@ -232,7 +237,7 @@ try {
   );
   // 7.1 另外两种打码模式
   await page.getByRole('tab', { name: '样式' }).click();
-  await page.getByRole('tab', { name: '模糊' }).click();
+  await page.getByRole('radio', { name: '模糊' }).click();
   await page.waitForTimeout(450);
   const blurMetrics = await regionMetrics(redactBox);
   check(
@@ -241,7 +246,7 @@ try {
     `高频差 ${metricsBefore.hf.toFixed(2)} → ${blurMetrics.hf.toFixed(2)}`,
   );
 
-  await page.getByRole('tab', { name: '纯色' }).click();
+  await page.getByRole('radio', { name: '纯色' }).click();
   await page.waitForTimeout(450);
   // 取两个区域的重叠中心的小块，避免量到区域边缘外的底图
   const solidMetrics = await regionMetrics({ x: 0.35, y: 0.355, w: 0.18, h: 0.045 });
@@ -251,7 +256,7 @@ try {
     `mean=${solidMetrics.mean.toFixed(1)} std=${solidMetrics.std.toFixed(2)}`,
   );
 
-  await page.getByRole('tab', { name: '马赛克' }).click();
+  await page.getByRole('radio', { name: '马赛克' }).click();
   await page.waitForTimeout(300);
   await page.screenshot({ path: shot('04-redact.png') });
 
@@ -263,7 +268,7 @@ try {
 
   // 9. 导出
   await page.getByRole('tab', { name: '导出' }).click();
-  await page.getByRole('tab', { name: 'JPEG' }).click();
+  await page.getByRole('radio', { name: 'JPEG' }).click();
   await page.waitForTimeout(250);
   const sampleName = await page.locator('.file-preview').innerText();
   check('命名模板生成示例名', sampleName.includes('card-watermark.jpg'), sampleName);
@@ -290,7 +295,70 @@ try {
   const single = await singlePromise;
   check('单张导出使用命名模板', /card/.test(single.suggestedFilename()), single.suggestedFilename());
 
-  // 10. 主题与响应式
+  // 10. 状态：读取中 / 读取失败 / 重试 / 移除
+  decoderNoiseUntil = Date.now() + 8000;
+  await page.setInputFiles('.thumb-add input[type="file"]', [fixture('broken.png')]);
+  await page.waitForSelector('.thumb.is-broken', { timeout: 10000 });
+  check('坏文件留在队列里而不是被静默丢弃', (await page.locator('.thumb.is-broken').count()) === 1);
+  check(
+    '失败提示是角色 alert（可被读屏立即播报）',
+    (await page.locator('.toast[role="alert"]').count()) === 1,
+  );
+  check(
+    '纸张抬头报出失败数量',
+    (await page.locator('.sheet-sub').innerText()).includes('读取失败'),
+    (await page.locator('.sheet-sub').innerText()).trim(),
+  );
+
+  await page.locator('.thumb.is-broken').click();
+  await page.waitForTimeout(300);
+  check('选中失败图片后进入错误态', await page.locator('.stage-state').isVisible());
+  check(
+    '错误态给出原因与三条出路',
+    (await page.locator('.stage-state').innerText()).includes('重试这张') &&
+      (await page.locator('.stage-state').innerText()).includes('从队列移除'),
+  );
+  await page.screenshot({ path: shot('07-error-state.png') });
+
+  await page.getByRole('button', { name: /重试这张/ }).click();
+  await page.waitForTimeout(1800);
+  check(
+    '重试失败会二次提示而不是静默',
+    (await page.locator('.toast').innerText()).includes('仍然无法读取'),
+    (await page.locator('.toast').innerText()).replace(/\n/g, ' '),
+  );
+
+  await page.getByRole('button', { name: /从队列移除/ }).click();
+  await page.waitForTimeout(400);
+  check('移除后回到正常图片', (await page.locator('.thumb.is-broken').count()) === 0);
+  check('移除失败项后画布恢复', (await page.locator('canvas.preview-canvas').count()) === 1);
+
+  // 读取中：把解码拖慢，确保骨架屏可见
+  await page.evaluate(() => {
+    const original = window.createImageBitmap.bind(window);
+    window.createImageBitmap = async (...args) => {
+      await new Promise((resolve) => setTimeout(resolve, 700));
+      return original(...args);
+    };
+  });
+  await page.setInputFiles('.thumb-add input[type="file"]', [fixture('photo.png')]);
+  await page.waitForTimeout(400);
+  check('读取中显示骨架瓷砖', (await page.locator('.thumb-skeleton').count()) >= 1);
+  check(
+    '读取中报出进度',
+    (await page.locator('.filmstrip-head').innerText()).includes('读取中'),
+    (await page.locator('.filmstrip-head').innerText()).replace(/\n/g, ' '),
+  );
+  await page.screenshot({ path: shot('08-loading.png') });
+  await page.waitForFunction(() => !document.querySelector('.thumb-skeleton'), null, {
+    timeout: 15000,
+  });
+  check(
+    '读取结束后骨架消失',
+    (await page.locator('.thumb-skeleton').count()) === 0,
+  );
+
+  // 11. 主题与响应式
   await page.locator('.topbar button[title*="深色"], .topbar button[title*="浅色"]').click();
   await page.waitForTimeout(300);
   check('深色主题切换', (await page.evaluate(() => document.documentElement.dataset.theme)) === 'dark');
@@ -304,7 +372,7 @@ try {
   check('390px 无横向溢出', scrollWidth <= 391, `scrollWidth=${scrollWidth}`);
   await page.screenshot({ path: shot('06-mobile.png') });
 
-  // 11. 隐私与稳定性
+  // 12. 隐私与稳定性
   check('零外部网络请求', external.length === 0, external.slice(0, 3).join(', '));
   check('无未捕获页面异常', pageErrors.length === 0, pageErrors.join(' | '));
   check('无控制台 error', consoleErrors.length === 0, consoleErrors.slice(0, 2).join(' | '));

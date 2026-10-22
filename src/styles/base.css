@@ -846,14 +846,25 @@ textarea {
 .toast-stack {
   position: fixed;
   bottom: 20px;
-  left: 50%;
-  transform: translateX(-50%);
+  right: 20px;
   z-index: 90;
   pointer-events: none;
 }
 
+@media (max-width: 720px) {
+  .toast-stack {
+    right: 12px;
+    left: 12px;
+  }
+
+  .toast-text {
+    flex: 1;
+  }
+}
+
 .toast {
   display: flex;
+  pointer-events: auto;
   align-items: center;
   gap: 8px;
   padding: 8px 12px;
@@ -1156,4 +1167,291 @@ textarea {
   font-size: var(--fs-meta);
   color: var(--muted);
   font-variant-numeric: tabular-nums;
+}
+
+/* ---------- stage states: reading / unreadable ----------
+   两种非就绪态都沿用相纸的形制：同样的边距与比例，只是纸上还没有画面
+   或画面坏了。状态出现在数据将出现的位置，不做成浮层。            */
+.stage-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  width: min(460px, 100%);
+  max-height: 100%;
+}
+
+.print-blank,
+.print-broken {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  padding: 10px;
+  background: var(--matte);
+  border: 1px solid color-mix(in srgb, var(--text) 12%, transparent);
+  border-radius: 2px;
+  margin: 0;
+}
+
+.print-skeleton {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  background: var(--well);
+  overflow: hidden;
+}
+
+.print-skeleton::after,
+.thumb-skeleton::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient( /* taste-skill-ignore: loading sheen, not decoration */
+    100deg,
+    transparent 20%,
+    color-mix(in srgb, var(--sheet) 92%, transparent) 50%,
+    transparent 80%
+  );
+  transform: translateX(-100%);
+  animation: sheen 1.5s var(--ease) infinite;
+}
+
+@keyframes sheen {
+  to {
+    transform: translateX(100%);
+  }
+}
+
+.print-broken {
+  display: grid;
+  place-items: center;
+  color: var(--faint);
+  background: var(--raised);
+  border-style: dashed;
+  border-color: var(--control);
+}
+
+.print-broken-mark {
+  width: 56px;
+  height: 56px;
+  color: var(--negative);
+  opacity: 0.85;
+}
+
+.stage-state-caption {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  text-align: center;
+}
+
+.stage-state-caption-wide {
+  align-items: flex-start;
+  text-align: left;
+  gap: 6px;
+}
+
+.stage-state-title {
+  font-size: var(--fs-lead);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--text);
+}
+
+.stage-state-track {
+  width: 100%;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--control);
+  overflow: hidden;
+}
+
+.stage-state-track span {
+  display: block;
+  height: 100%;
+  background: var(--text);
+  transition: width 0.2s var(--ease);
+}
+
+.stage-state-body {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0;
+  font-size: var(--fs-label);
+  color: var(--muted);
+  min-width: 0;
+}
+
+.stage-state-file {
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text);
+  font-weight: 500;
+}
+
+.stage-state-reason {
+  margin: 0;
+  padding: 7px 10px;
+  width: 100%;
+  border-left: 2px solid var(--negative);
+  background: var(--raised);
+  color: var(--muted);
+  font-size: var(--fs-meta);
+  line-height: 1.6;
+}
+
+.stage-state-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 2px;
+}
+
+/* ---------- filmstrip: broken / pending ---------- */
+.thumb-broken {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: color-mix(in srgb, var(--negative) 10%, var(--raised));
+}
+
+.thumb.is-broken {
+  border-style: dashed;
+  border-color: color-mix(in srgb, var(--negative) 45%, var(--border));
+}
+
+.thumb-failed {
+  position: absolute;
+  inset: auto 0 0 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 1px 0 2px;
+  background: var(--pill-negative-bg);
+  color: var(--pill-negative-ink);
+  border-top: 1px solid color-mix(in srgb, var(--negative) 32%, transparent);
+  font-size: var(--fs-tiny);
+  line-height: 1.4;
+  font-weight: 500;
+}
+
+.thumb-skeleton {
+  position: relative;
+  overflow: hidden;
+  background: var(--well);
+  border-style: dashed;
+  border-color: var(--control);
+}
+
+.thumb-skeleton::after {
+  animation-delay: 0.2s;
+}
+
+.filmstrip-reading {
+  margin-left: 8px;
+  color: var(--muted);
+}
+
+.filmstrip-failed {
+  margin-left: 8px;
+  color: var(--negative);
+  font-weight: 500;
+}
+
+/* ---------- toast: dismissible ---------- */
+.toast-text {
+  max-width: 46ch;
+}
+
+.toast-close {
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  margin-left: 2px;
+  border-radius: var(--radius-chip);
+  color: inherit;
+  opacity: 0.62;
+}
+
+.toast-close:hover {
+  opacity: 1;
+  background: color-mix(in srgb, currentColor 12%, transparent);
+}
+
+/* ---------- render crash ---------- */
+.crash {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: var(--frame);
+}
+
+.crash-sheet {
+  width: min(520px, 100%);
+  padding: 28px;
+  background: var(--sheet);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sheet);
+}
+
+.crash-meta {
+  margin: 0 0 12px;
+  padding-left: 9px;
+  border-left: 2px solid var(--negative);
+  font-family: var(--font-figures);
+  font-size: var(--fs-meta);
+  color: var(--muted);
+}
+
+.crash-title {
+  margin: 0 0 6px;
+  font-size: var(--fs-title);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.crash-body {
+  margin: 0 0 14px;
+  font-size: var(--fs-body);
+  line-height: 1.7;
+  color: var(--muted);
+}
+
+.crash-detail {
+  margin: 0 0 16px;
+  padding: 10px 12px;
+  max-height: 120px;
+  overflow: auto;
+  background: var(--raised);
+  border-radius: var(--radius-control);
+  font-family: var(--font-figures);
+  font-size: var(--fs-meta);
+  color: var(--muted);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.crash-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* ---------- reduced motion ---------- */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

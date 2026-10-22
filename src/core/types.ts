@@ -202,3 +202,28 @@ export interface Point {
 export type Ctx2D = CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
 
 export type ImageSources = Record<string, CanvasImageSource>;
+
+/** 队列里的图片状态：解码成功才可参与渲染与导出 */
+export type ImageStatus = 'ready' | 'failed';
+
+export interface ImageItem {
+  id: string;
+  name: string;
+  mime: string;
+  size: number;
+  width: number;
+  height: number;
+  /** 解码失败时为 null，界面据 status 渲染错误态 */
+  bitmap: ImageBitmap | null;
+  skipped: boolean;
+  status: ImageStatus;
+  /** 失败原因，直接展示给用户 */
+  error?: string;
+  /** 仅在失败时保留原文件，供「重试」再次解码 */
+  file?: File;
+}
+
+export interface ImportProgress {
+  done: number;
+  total: number;
+}

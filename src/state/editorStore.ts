@@ -14,7 +14,9 @@ import { isLayoutLayer } from '../core/layers';
 import { isImageFile, decodeImage, blobToDataUrl } from '../core/imageSource';
 import type {
   ExportSettings,
+  ImageItem,
   ImageLayer,
+  ImportProgress,
   LayoutConfig,
   Preset,
   RedactRegion,
@@ -22,16 +24,10 @@ import type {
   WatermarkLayer,
 } from '../core/types';
 
-export interface ImageItem {
-  id: string;
-  name: string;
-  mime: string;
-  size: number;
-  width: number;
-  height: number;
-  bitmap: ImageBitmap;
-  skipped: boolean;
-}
+import { isReadyImage } from '../core/queue';
+
+export type { ImageItem, ImageStatus, ImportProgress } from '../core/types';
+export { countPending, isReadyImage, type ReadyImage } from '../core/queue';
 
 export interface CustomFont {
   family: string;
@@ -98,11 +94,13 @@ export interface EditorState {
   theme: Theme;
   comparing: boolean;
   toast: Toast | null;
-  importsBusy: boolean;
+  importProgress: ImportProgress | null;
   pastCount: number;
   futureCount: number;
 
   addImages: (files: File[]) => Promise<void>;
+  retryImage: (id: string) => Promise<void>;
+  cancelImports: () => void;
   removeImage: (id: string) => void;
   setActiveImage: (id: string) => void;
   moveImage: (id: string, direction: -1 | 1) => void;
@@ -148,6 +146,8 @@ export interface EditorState {
 
 const history: HistoryState = { past: [], future: [], lastKey: null, lastAt: 0 };
 let toastSeq = 0;
+/** 每次导入/取消都自增，旧循环据此提前退出 */
+let importSeq = 0;
 
 /** 首屏默认水印：斜向密铺的「仅供办理业务使用」 */
 const initialLayer = createTextLayer({
@@ -205,7 +205,7 @@ export const useEditor = create<EditorState>()((set, get) => {
     theme: loadTheme(),
     comparing: false,
     toast: null,
-    importsBusy: false,
+    importProgress: null,
     pastCount: 0,
     futureCount: 0,
 
@@ -224,43 +224,121 @@ export const useEditor = create<EditorState>()((set, get) => {
       if (imageFiles.length > accepted.length) {
         get().pushToast(`队列上限 ${MAX_IMAGES} 张，已忽略多余的图片`, 'info');
       }
-      set({ importsBusy: true });
+
+      const seq = ++importSeq;
+      set({ importProgress: { done: 0, total: accepted.length } });
+
       const added: ImageItem[] = [];
-      for (const file of accepted) {
+      let failed = 0;
+      let cancelled = false;
+
+      for (let index = 0; index < accepted.length; index += 1) {
+        if (seq !== importSeq) {
+          cancelled = true;
+          break;
+        }
+        const file = accepted[index];
         try {
           const loaded = await decodeImage(file);
           added.push({
             id: uid('src'),
-            name: file.name || `image-${added.length + 1}`,
+            name: file.name || `image-${index + 1}`,
             mime: file.type || 'image/png',
             size: file.size,
             width: loaded.width,
             height: loaded.height,
             bitmap: loaded.bitmap,
             skipped: false,
+            status: 'ready',
           });
-        } catch {
-          get().pushToast(`无法读取 ${file.name}`, 'error');
+        } catch (error) {
+          failed += 1;
+          // 失败项留在队列里：用户能看到是哪一张坏了，并能重试或移除
+          added.push({
+            id: uid('src'),
+            name: file.name || `image-${index + 1}`,
+            mime: file.type || 'image/png',
+            size: file.size,
+            width: 0,
+            height: 0,
+            bitmap: null,
+            skipped: false,
+            status: 'failed',
+            error: error instanceof Error ? error.message : '无法解码这张图片',
+            file,
+          });
         }
+        if (seq === importSeq) set({ importProgress: { done: index + 1, total: accepted.length } });
       }
+
       set((state) => {
         const images = [...state.images, ...added].slice(0, MAX_IMAGES);
-        return {
-          images,
-          importsBusy: false,
-          activeImageId: state.activeImageId ?? images[0]?.id ?? null,
-        };
+        const activeImageId =
+          state.activeImageId ?? images.find((item) => isReadyImage(item))?.id ?? images[0]?.id ?? null;
+        return { images, importProgress: null, activeImageId };
       });
-      if (added.length) {
-        get().pushToast(`已添加 ${added.length} 张图片`, 'success');
+
+      if (cancelled) {
+        get().pushToast(
+          added.length ? `已取消，先加入 ${added.length} 张` : '已取消读取',
+          'info',
+        );
+        return;
       }
+      if (failed) {
+        get().pushToast(
+          added.length > failed
+            ? `已添加 ${added.length - failed} 张，${failed} 张读取失败`
+            : `${failed} 张图片读取失败，可重试或移除`,
+          'error',
+        );
+        return;
+      }
+      if (added.length) get().pushToast(`已添加 ${added.length} 张图片`, 'success');
+    },
+
+    retryImage: async (id) => {
+      const item = get().images.find((entry) => entry.id === id);
+      if (!item?.file) return;
+      try {
+        const loaded = await decodeImage(item.file);
+        set((state) => ({
+          images: state.images.map((entry) =>
+            entry.id === id
+              ? {
+                  ...entry,
+                  bitmap: loaded.bitmap,
+                  width: loaded.width,
+                  height: loaded.height,
+                  status: 'ready' as const,
+                  error: undefined,
+                  file: undefined,
+                }
+              : entry,
+          ),
+        }));
+        get().pushToast(`已恢复 ${item.name}`, 'success');
+      } catch (error) {
+        const message = error instanceof Error ? error.message : '无法解码这张图片';
+        set((state) => ({
+          images: state.images.map((entry) =>
+            entry.id === id ? { ...entry, error: message } : entry,
+          ),
+        }));
+        get().pushToast(`仍然无法读取 ${item.name}`, 'error');
+      }
+    },
+
+    cancelImports: () => {
+      if (!get().importProgress) return;
+      importSeq += 1;
     },
 
     removeImage: (id) => {
       const state = get();
       const index = state.images.findIndex((item) => item.id === id);
       if (index < 0) return;
-      state.images[index].bitmap.close?.();
+      state.images[index].bitmap?.close?.();
       const images = state.images.filter((item) => item.id !== id);
       const activeImageId =
         state.activeImageId === id
@@ -288,8 +366,9 @@ export const useEditor = create<EditorState>()((set, get) => {
       })),
 
     clearImages: () => {
-      get().images.forEach((item) => item.bitmap.close?.());
-      set({ images: [], activeImageId: null });
+      importSeq += 1;
+      get().images.forEach((item) => item.bitmap?.close?.());
+      set({ images: [], activeImageId: null, importProgress: null });
     },
 
     addTextLayer: () => {

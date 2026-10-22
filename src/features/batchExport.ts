@@ -1,7 +1,9 @@
 import { buildFileName, copyBlobToClipboard, downloadBlob, resolveMime, extFromMime } from '../core/export';
 import { fitSize } from '../core/geometry';
 import { dataUrlToBitmap } from '../core/imageSource';
-import { useEditor, type ImageItem } from '../state/editorStore';
+import { isReadyImage, type ReadyImage } from '../core/queue';
+import { useEditor } from '../state/editorStore';
+import type { ImageItem } from '../core/types';
 import { useBatchStore } from '../state/batchStore';
 import { RenderPool, renderOnMainThread, type RenderJobInput } from '../workers/pool';
 import type { WatermarkLayer } from '../core/types';
@@ -54,34 +56,28 @@ function timestamp(): string {
   )}${pad(now.getMinutes())}`;
 }
 
-function describeTargets(mode: BatchMode, images: ImageItem[]): {
-  mime: string;
-  targets: ImageItem[];
-} {
-  const targets =
-    mode === 'current' || mode === 'copy'
-      ? images.slice(0, 1)
-      : images.filter((item) => !item.skipped);
-  const mime = mode === 'copy' ? 'image/png' : resolveMime('original', targets[0]?.mime ?? '');
-  return { mime, targets };
+function describeTargets(mode: BatchMode, images: ImageItem[]): ReadyImage[] {
+  const ready = images.filter(isReadyImage);
+  return mode === 'current' || mode === 'copy'
+    ? ready.slice(0, 1)
+    : ready.filter((item) => !item.skipped);
 }
 
 export async function runBatch(mode: BatchMode): Promise<void> {
   const state = useEditor.getState();
   const settings = state.exportSettings;
   const activeImage = state.images.find((item) => item.id === state.activeImageId) ?? null;
-  const sourceImages = mode === 'current' || mode === 'copy'
-    ? activeImage
-      ? [activeImage]
-      : []
-    : state.images;
+  const pool_ = mode === 'current' || mode === 'copy' ? (activeImage ? [activeImage] : []) : state.images;
+  const targets = describeTargets(mode, pool_);
 
-  if (!sourceImages.length) {
-    state.pushToast('请先添加图片', 'error');
+  if (!targets.length) {
+    const broken = state.images.some((item) => item.status === 'failed');
+    state.pushToast(
+      broken ? '没有可导出的图片：请先重试或移除读取失败的图片' : '请先添加图片',
+      'error',
+    );
     return;
   }
-
-  const { targets } = describeTargets(mode, sourceImages);
   const visibleLayers = state.layers.filter((layer) => layer.visible);
   const useMainThread = state.customFonts.length > 0;
 
@@ -103,7 +99,7 @@ export async function runBatch(mode: BatchMode): Promise<void> {
   let failed = 0;
   let cursor = 0;
 
-  const renderOne = async (item: ImageItem, index: number): Promise<void> => {
+  const renderOne = async (item: ReadyImage, index: number): Promise<void> => {
     const mime = mode === 'copy' ? 'image/png' : resolveMime(settings.format, item.mime);
     const size = fitSize({ width: item.width, height: item.height }, settings.maxSize);
     const job: RenderJobInput = {
@@ -199,7 +195,15 @@ export async function runBatch(mode: BatchMode): Promise<void> {
   const { default: JSZip } = await import('jszip');
   const zip = new JSZip();
   results.forEach((item) => zip.file(item.name, item.blob));
-  const zipBlob = await zip.generateAsync({ type: 'blob', compression: 'STORE' });
+  let zipBlob: Blob;
+  try {
+    zipBlob = await zip.generateAsync({ type: 'blob', compression: 'STORE' });
+  } catch (error) {
+    console.error('[watermark] zip failed', error);
+    setProgress(null);
+    state.pushToast('打包 ZIP 失败，可改用「逐张下载」', 'error');
+    return;
+  }
   setProgress(null);
   downloadBlob(zipBlob, `watermark-${timestamp()}.zip`);
   state.pushToast(

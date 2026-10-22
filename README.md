@@ -11,11 +11,15 @@
 ![编辑器界面](docs/screenshots/editor-light.jpg)
 
 <details>
-<summary>更多截图（打码 / 标签条样式 / 深色主题 / 移动端）</summary>
+<summary>更多截图（打码 / 状态 / 标签条 / 深色主题 / 移动端）</summary>
 
-| 区域打码（马赛克） | 标签条 + 描边 | 深色主题 | 移动端 390px |
+| 区域打码（马赛克） | 读取中（骨架 + 进度） | 单张读取失败 | 标签条 + 描边 |
 | --- | --- | --- | --- |
-| ![](docs/screenshots/redact.jpg) | ![](docs/screenshots/label-chip.jpg) | ![](docs/screenshots/editor-dark.jpg) | ![](docs/screenshots/mobile.jpg) |
+| ![](docs/screenshots/redact.jpg) | ![](docs/screenshots/state-loading.jpg) | ![](docs/screenshots/state-error.jpg) | ![](docs/screenshots/label-chip.jpg) |
+
+| 深色主题 | 移动端 390px |
+| --- | --- |
+| ![](docs/screenshots/editor-dark.jpg) | ![](docs/screenshots/mobile.jpg) |
 
 </details>
 
@@ -40,7 +44,7 @@
 | 编辑体验 | 无撤销 | 撤销/重做（连续滑动自动合并为一步）、快捷键、按住空格对比原图、主题切换 |
 | 方案复用 | 无 | 6 套内置预设 + 自定义方案（localStorage）+ 方案 JSON 导入导出 |
 | 图片处理 | 直接绘制 | EXIF 方向矫正、超 8192px 自动降采样、上限 60 张、逐张跳过/排序 |
-| 质量保障 | 无测试 | 35 个单元测试 + 32 项 Playwright 端到端断言、`tsc --noEmit`、GitHub Actions CI |
+| 质量保障 | 无测试 | 41 个单元测试 + 43 项 Playwright 端到端断言（含空 / 加载 / 错误三态）、`tsc --noEmit`、GitHub Actions CI |
 | 部署 | GitHub Pages + Docker | EdgeOne Makers / EdgeOne Pages / GitHub Pages / Docker，含 PWA 离线安装 |
 
 ---
@@ -81,6 +85,14 @@
 - 浅色 / 深色主题（跟随系统，可手动切换并记忆）
 - 响应式三栏布局，窄屏自动降级为纵向堆叠
 - PWA：可安装到桌面，断网可用
+
+### 状态（空 / 加载 / 错误）
+- **空**：还没图时，舞台是一张 4:3 的空白相纸，首个动作就在纸中央；队列区不重复同一句话
+- **加载**：解码期间纸面换成骨架并给出 `已读 / 总数` 与进度条，胶片条同步长出骨架瓷砖，随时可「取消读取」（已解码的图片会保留）
+- **错误**：读不出来的文件**不进也不丢**——留在队列里、打上「失败」标记并保留原文件，选中后舞台显示文件名、体积、失败原因，以及「重试这张 / 从队列移除 / 换一张」三条出路
+- **导出错误**：ZIP 打包失败会明确提示改用逐张下载；全部图片都失败时，主按钮禁用并在抬头说明原因
+- **渲染兜底**：根节点有 ErrorBoundary，组件抛错会退化成一张说明卡（重载 / 清除本地方案后重载），不会白屏
+- **提示分级**：成功 2.4s 自动消失，错误停留 6s、可手动关闭，并以 `role="alert"` 让读屏立即播报
 
 ### 隐私
 - 无后端、无分析脚本、无外部字体 CDN；构建产物不含任何第三方请求
@@ -136,6 +148,7 @@ watermark-studio/
 │   │   ├── geometry.ts         # 锚点计算（单点 / 平铺 / 网格）、尺寸适配
 │   │   ├── renderer.ts         # 唯一的绘制入口：底图 + 图层 → Canvas
 │   │   ├── imageSource.ts      # 解码、EXIF 纠正、降采样、dataURL 互转
+│   │   ├── queue.ts            # 队列判定（isReadyImage / countPending）
 │   │   └── export.ts           # MIME/扩展名、命名模板、编码、下载、剪贴板
 │   ├── workers/
 │   │   ├── render.worker.ts    # OffscreenCanvas 渲染 + 编码
@@ -153,12 +166,14 @@ watermark-studio/
 │   │   ├── Inspector.tsx        # 样式 / 布局 / 导出 / 方案 四个页签
 │   │   ├── StylePanel.tsx  LayoutPanel.tsx  ExportPanel.tsx  PresetPanel.tsx
 │   │   ├── controls.tsx         # 表单原语（滑杆 / 分段 / 开关 / 取色 / 九宫格）
+│   │   ├── StageStates.tsx     # 台面的读取中 / 读取失败两种状态
+│   │   ├── ErrorBoundary.tsx   # 渲染崩溃兜底
 │   │   ├── DropZone.tsx  ToastHost.tsx  ProgressOverlay.tsx  icons.tsx
 │   ├── styles/                  # fonts.css（自托管字体）/ tokens.css（设计变量）
 │   │                            # base.css（外壳与画布）/ panels.css（检查器与控件）
 │   ├── App.tsx  main.tsx
-├── tests/                       # 35 个单测：断行 / 几何 / 命名 / 变量
-│   └── e2e/                     # Playwright 冒烟：导入 → 编辑 → 打码 → 导出（32 断言）
+├── tests/                       # 41 个单测：断行 / 几何 / 命名 / 变量 / 队列
+│   └── e2e/                     # Playwright 冒烟：导入 → 状态 → 编辑 → 打码 → 导出（43 断言）
 ├── public/                      # favicon / manifest / service worker
 ├── docs/PLAN.md                 # 项目规划、功能清单、技术选型与路线图
 ├── .github/workflows/           # CI（类型检查 + 测试 + 构建）与 EdgeOne 部署
@@ -249,9 +264,9 @@ Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'
 ## 测试
 
 ```bash
-npm test          # 35 个单元测试（vitest）
+npm test          # 41 个单元测试（vitest）
 npm run build     # 类型检查 + 生产构建
-npm run test:e2e  # 32 项端到端断言（需本机 Chrome，脚本会自动起 preview）
+npm run test:e2e  # 43 项端到端断言（需本机 Chrome，脚本会自动起 preview）
 ```
 
 | 文件 | 覆盖 |
@@ -260,7 +275,8 @@ npm run test:e2e  # 32 项端到端断言（需本机 Chrome，脚本会自动�
 | `tests/geometry.test.ts` | 九宫格坐标、边距与偏移、平铺覆盖率与对称性、旋转扩边、错行、网格数量与兜底、长边缩放 |
 | `tests/export.test.ts` | MIME 映射（含 GIF/SVG → PNG）、扩展名、命名模板六种占位符、非法字符过滤、回退规则 |
 | `tests/tokens.test.ts` | 日期/时间/文件名/序号替换、大小写不敏感、未知占位符、缺值兜底 |
-| `tests/e2e/smoke.mjs` | 首张上传后**继续添加**、水印绘制与对比原图、撤销/重做、拖拽定位、方向键微调、三种打码模式的像素级验证、预设、ZIP / 单张导出、深色主题、390px 响应式、零外部请求 |
+| `tests/state.test.ts` | 队列判定：失败项不算就绪、`ready` 但无 bitmap 不算就绪、跳过与失败都不计入待处理 |
+| `tests/e2e/smoke.mjs` | 首张上传后**继续添加**、坏文件留在队列并可重试/移除、骨架瓷砖与读取进度、水印绘制与对比原图、撤销/重做、拖拽定位、方向键微调、三种打码模式的像素级验证、预设、ZIP / 单张导出、深色主题、390px 响应式、零外部请求 |
 
 > 打码相关断言不是「截图看着对」：脚本会读取画布像素，计算区域内的高频能量与标准差，验证马赛克把块内细节抹平、模糊降低梯度、纯色把区域方差压到近 0。
 >
@@ -273,6 +289,7 @@ npm run test:e2e  # 32 项端到端断言（需本机 Chrome，脚本会自动�
 - [x] 图形打码（马赛克 / 模糊 / 纯色区域，证件号遮挡）
 - [x] 文字动态变量（时间戳 / 文件名 / 序号）
 - [x] Playwright 端到端用例入库（`npm run test:e2e`）
+- [x] 空 / 加载 / 错误三态（含可取消的读取、失败重试、渲染兜底）
 - [ ] 每张图片独立覆盖水印参数（当前为全局统一）
 - [ ] 二维码水印图层
 - [ ] 打码区域的椭圆 / 画笔自由形状

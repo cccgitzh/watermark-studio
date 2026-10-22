@@ -19,7 +19,11 @@ export function DropZone() {
         event.preventDefault();
         setOver(true);
       }}
-      onDragLeave={() => setOver(false)}
+      onDragLeave={(event) => {
+        // 指针移到子元素上也会触发 dragleave，只有真正离开拖拽区才收起高亮
+        if (event.currentTarget.contains(event.relatedTarget as Node | null)) return;
+        setOver(false);
+      }}
       onDrop={(event) => {
         event.preventDefault();
         event.stopPropagation();

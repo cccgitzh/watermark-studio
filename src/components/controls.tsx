@@ -108,14 +108,42 @@ export function Segmented<T extends string | number>({
   onChange: (value: T) => void;
   ariaLabel?: string;
 }) {
+  // 单选组：← → 切换并移动焦点，Tab 只停在当前项
+  const current = options.findIndex((option) => option.value === value);
+  const step = (delta: number) => {
+    const next = options[(current + delta + options.length) % options.length];
+    if (!next) return;
+    onChange(next.value);
+    requestAnimationFrame(() => {
+      document
+        .querySelector<HTMLButtonElement>(`[data-segmented="${String(next.value)}"]`)
+        ?.focus();
+    });
+  };
+
   return (
-    <div className="segmented" role="tablist" aria-label={ariaLabel}>
+    <div
+      className="segmented"
+      role="radiogroup"
+      aria-label={ariaLabel}
+      onKeyDown={(event) => {
+        if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
+          event.preventDefault();
+          step(1);
+        } else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
+          event.preventDefault();
+          step(-1);
+        }
+      }}
+    >
       {options.map((option) => (
         <button
           key={String(option.value)}
           type="button"
-          role="tab"
-          aria-selected={option.value === value}
+          role="radio"
+          aria-checked={option.value === value}
+          tabIndex={option.value === value ? 0 : -1}
+          data-segmented={String(option.value)}
           className={option.value === value ? 'segmented-item is-active' : 'segmented-item'}
           onClick={() => onChange(option.value)}
         >

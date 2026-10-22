@@ -25,7 +25,7 @@ export function ExportPanel() {
     (state) => state.images.find((item) => item.id === state.activeImageId) ?? null,
   );
 
-  const pending = images.filter((item) => !item.skipped);
+  const pending = images.filter((item) => item.status === 'ready' && !item.skipped);
   const mime = resolveMime(settings.format, activeImage?.mime ?? 'image/jpeg');
   const ext = extFromMime(mime);
   const outputSize = activeImage

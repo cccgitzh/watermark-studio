@@ -1,5 +1,6 @@
 import { useRef } from 'react';
 import { resolveMime, extFromMime } from '../core/export';
+import { countPending } from '../core/queue';
 import { useEditor } from '../state/editorStore';
 import { IconCompare, IconPlus } from './icons';
 
@@ -14,19 +15,24 @@ export function SheetHead() {
   );
   const format = useEditor((state) => state.exportSettings.format);
   const comparing = useEditor((state) => state.comparing);
+  const importProgress = useEditor((state) => state.importProgress);
   const setComparing = useEditor((state) => state.setComparing);
   const addImages = useEditor((state) => state.addImages);
   const inputRef = useRef<HTMLInputElement | null>(null);
 
-  const pending = images.filter((item) => !item.skipped).length;
+  const pending = countPending(images);
+  const failed = images.filter((item) => item.status === 'failed').length;
   const ext = extFromMime(
     resolveMime(format, activeImage?.mime ?? 'image/jpeg'),
   ).toUpperCase();
 
-  const summary =
-    images.length === 0
+  const summary = importProgress
+    ? `正在读取 ${importProgress.done} / ${importProgress.total} 张，可以继续调整水印`
+    : images.length === 0
       ? '拖入图片开始，全部处理都在本机完成'
-      : `队列 ${images.length} 张，${pending} 张待处理，导出为 ${ext}`;
+      : failed > 0
+        ? `队列 ${images.length} 张，${pending} 张可导出，${failed} 张读取失败`
+        : `队列 ${images.length} 张，${pending} 张待处理，导出为 ${ext}`;
 
   return (
     <header className="sheet-head">
