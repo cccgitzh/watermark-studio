@@ -6,6 +6,7 @@ import './styles/fonts.css';
 import './styles/tokens.css';
 import './styles/base.css';
 import './styles/panels.css';
+import './styles/print.css';
 
 const container = document.getElementById('root');
 if (!container) throw new Error('未找到 #root 挂载点');

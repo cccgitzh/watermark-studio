@@ -137,7 +137,7 @@ function TextStyle({ layer }: { layer: TextLayer }) {
             if (file) void handleFontFile(file);
           }}
         />
-        <Hint>自定义字体只保存在当前浏览器会话中，不会写入方案文件。</Hint>
+        <Hint>自定义字体只在当前会话有效，不写入方案文件。</Hint>
         <Field label="动态变量" hint="批量导出时按每张图解析">
           <div className="token-list token-grid">
             {TEXT_TOKENS.map((item) => (
@@ -455,14 +455,11 @@ function RedactStyle({ layer }: { layer: RedactLayer }) {
           format={(value) => pct(value, 1)}
           onChange={(value) => updateLayer(layer.id, { radius: value }, `radius-${layer.id}`)}
         />
-        <Hint>
-          打码始终绘制在文字 / Logo 之前，水印不会盖住打码区域；导出时按原始像素重新计算，不会因为缩放而失效。
-        </Hint>
       </PanelSection>
 
       <PanelSection title="打码区域" hint={`${layer.regions.length} 个`}>
         {layer.regions.length === 0 ? (
-          <Hint>在左侧画布上按住拖动，框选出需要打码的区域。</Hint>
+          <Hint>在画布上按住拖动，框选出需要打码的区域。</Hint>
         ) : (
           <div className="region-list">
             {layer.regions.map((region, index) => (
@@ -508,7 +505,7 @@ function RedactStyle({ layer }: { layer: RedactLayer }) {
             ))}
           </div>
         )}
-        <Hint>画布上拖动空白处可新增区域；拖动方框移动，右下角手柄缩放。</Hint>
+        <Hint>拖动空白处新增区域，拖动方框移动，右下角手柄缩放。打码始终先于水印绘制。</Hint>
       </PanelSection>
 
       <PanelSection title="图层名称">

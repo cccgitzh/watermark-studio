@@ -1,7 +1,8 @@
 import { runBatch } from '../features/batchExport';
 import { countPending } from '../core/queue';
 import { useEditor } from '../state/editorStore';
-import { IconDownload, IconMoon, IconRedo, IconSun, IconUndo } from './icons';
+import { usePrint } from '../state/printStore';
+import { IconDownload, IconMoon, IconPrint, IconRedo, IconSun, IconUndo } from './icons';
 
 /** 顶栏：产品标识 + 作用域，右侧是撤销栈、主题与这一屏唯一的主操作。 */
 export function TopBar() {
@@ -12,6 +13,7 @@ export function TopBar() {
   const pastCount = useEditor((state) => state.pastCount);
   const futureCount = useEditor((state) => state.futureCount);
   const pending = useEditor((state) => countPending(state.images));
+  const openPrint = usePrint((state) => state.openSheet);
 
   return (
     <header className="topbar">
@@ -77,6 +79,10 @@ export function TopBar() {
           onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
         >
           {theme === 'dark' ? <IconSun size={16} /> : <IconMoon size={16} />}
+        </button>
+        <button type="button" className="button" disabled={!pending} onClick={openPrint}>
+          <IconPrint size={14} />
+          打印
         </button>
         <button
           type="button"

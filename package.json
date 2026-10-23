@@ -1,7 +1,7 @@
 {
   "name": "watermark-studio",
   "private": true,
-  "version": "1.3.0",
+  "version": "1.4.0",
   "type": "module",
   "description": "Local-first batch image watermark studio. Canvas + Web Worker, zero upload, deployable to EdgeOne Pages.",
   "license": "MIT",

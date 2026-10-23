@@ -7,7 +7,6 @@ import {
   IconEye,
   IconEyeOff,
   IconImage,
-  IconPlus,
   IconRedact,
   IconText,
   IconTrash,
@@ -125,28 +124,39 @@ export function LayersPanel() {
       </div>
 
       <div className="rail-footer">
-        <button type="button" className="button button-primary" onClick={addTextLayer}>
-          <IconPlus size={14} />
-          添加文字水印
-        </button>
-        <button
-          type="button"
-          className="button"
-          onClick={() => logoInput.current?.click()}
-          disabled={layers.length >= MAX_LAYERS}
-        >
-          <IconImage size={14} />
-          添加 Logo 水印
-        </button>
-        <div className="rail-footer-row">
+        <div className="rail-add">
           <button
             type="button"
-            className="button"
+            className="rail-add-button"
+            aria-label="添加文字水印"
+            title="添加文字水印"
+            onClick={addTextLayer}
+            disabled={layers.length >= MAX_LAYERS}
+          >
+            <IconText size={15} />
+            <span>文字</span>
+          </button>
+          <button
+            type="button"
+            className="rail-add-button"
+            aria-label="添加 Logo 水印"
+            title="添加 Logo 水印"
+            onClick={() => logoInput.current?.click()}
+            disabled={layers.length >= MAX_LAYERS}
+          >
+            <IconImage size={15} />
+            <span>Logo</span>
+          </button>
+          <button
+            type="button"
+            className="rail-add-button"
+            aria-label="添加打码"
+            title="添加打码图层"
             onClick={addRedactLayer}
             disabled={layers.length >= MAX_LAYERS}
           >
-            <IconRedact size={14} />
-            添加打码
+            <IconRedact size={15} />
+            <span>打码</span>
           </button>
         </div>
         <input

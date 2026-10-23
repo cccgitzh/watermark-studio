@@ -148,7 +148,7 @@ export function PresetPanel() {
             导入 JSON
           </button>
         </ButtonRow>
-        <Hint>方案文件不包含图片，可安全分享给同事复用同一套水印参数。</Hint>
+        <Hint>方案不含图片，可直接分享复用。</Hint>
         <input
           ref={fileInput}
           type="file"

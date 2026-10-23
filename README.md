@@ -11,7 +11,11 @@
 ![编辑器界面](docs/screenshots/editor-light.jpg)
 
 <details>
-<summary>更多截图（打码 / 状态 / 标签条 / 深色主题 / 移动端）</summary>
+<summary>更多截图（A4 打印 / 打码 / 状态 / 深色 / 移动端）</summary>
+
+| A4 正反面打印 | 打印出来的纸面 |
+| --- | --- |
+| ![](docs/screenshots/print-a4.jpg) | ![](docs/screenshots/print-output.png) |
 
 | 区域打码（马赛克） | 读取中（骨架 + 进度） | 单张读取失败 | 标签条 + 描边 |
 | --- | --- | --- | --- |
@@ -44,7 +48,7 @@
 | 编辑体验 | 无撤销 | 撤销/重做（连续滑动自动合并为一步）、快捷键、按住空格对比原图、主题切换 |
 | 方案复用 | 无 | 6 套内置预设 + 自定义方案（localStorage）+ 方案 JSON 导入导出 |
 | 图片处理 | 直接绘制 | EXIF 方向矫正、超 8192px 自动降采样、上限 60 张、逐张跳过/排序 |
-| 质量保障 | 无测试 | 41 个单元测试 + 43 项 Playwright 端到端断言（含空 / 加载 / 错误三态）、`tsc --noEmit`、GitHub Actions CI |
+| 质量保障 | 无测试 | 55 个单元测试 + 55 项 Playwright 端到端断言（含空 / 加载 / 错误三态与 A4 打印）、`tsc --noEmit`、GitHub Actions CI |
 | 部署 | GitHub Pages + Docker | EdgeOne Makers / EdgeOne Pages / GitHub Pages / Docker，含 PWA 离线安装 |
 
 ---
@@ -66,6 +70,14 @@
 - **区域编辑**：画布上拖拽框选新区域、拖动方框移动、右下角手柄缩放、区域列表可逐条删除与微调
 - **安全顺序**：打码层始终绘制在文字 / Logo 之前，水印不会盖住打码区；导出时按原始像素重算，缩放不会让打码失效
 - **失败兜底**：浏览器不支持 `ctx.filter` 时，「模糊」自动降级为马赛克，避免出现「看起来糊了其实没打码」
+
+### 打印（身份证正反面 · A4）
+- **一张纸两个面**：正面与反面按 85.6 × 54 mm（ID-1）**1:1** 排进 A4（210 × 297 mm），从队列里任选两张，互不重复
+- **版面可调**：上下 / 并排、两张间距 0–40 mm、页边距 0–50 mm、尺寸 90–105%、贴页边 / 居中
+- **可验证**：裁切线、卡片细边、50 mm 校准尺；预览下方实时给出「正面 左 16.0 · 上 16.0 mm」这样的落位读数，打印后用尺子就能对
+- **打印链路**：纸张与页边距由 `@page` 固定为 A4 + 0 边距，纸面按 300 DPI 现画（2480 × 3508 px），预览与打印共用同一套毫米几何
+- **带水印**：默认用当前水印设置合成每张卡片（可关掉），合成在卡片画布上完成，不会把原图拉伸变形
+- **越界提示**：超出纸边给出毫米数与「会被裁切」的警告；只是超出页边距则提示留白不足，仍可完整打印
 
 ### 版式与定位
 - **单点**：九宫格锚点 + 边距 + 水平/垂直百分比偏移，可直接在画布上拖动，或用方向键微调（`Shift` + 方向键更精细）
@@ -149,13 +161,15 @@ watermark-studio/
 │   │   ├── renderer.ts         # 唯一的绘制入口：底图 + 图层 → Canvas
 │   │   ├── imageSource.ts      # 解码、EXIF 纠正、降采样、dataURL 互转
 │   │   ├── queue.ts            # 队列判定（isReadyImage / countPending）
+│   │   ├── print.ts            # A4 证件排版：几何（毫米）+ 300 DPI 绘制 + 裁切线
 │   │   └── export.ts           # MIME/扩展名、命名模板、编码、下载、剪贴板
 │   ├── workers/
 │   │   ├── render.worker.ts    # OffscreenCanvas 渲染 + 编码
 │   │   └── pool.ts             # 渲染池（排队 / 并发 / 主线程回退）
 │   ├── state/
 │   │   ├── editorStore.ts      # zustand：图层、导出、图片队列、撤销栈、预设
-│   │   └── batchStore.ts       # 批处理进度与取消信号
+│   │   ├── batchStore.ts       # 批处理进度与取消信号
+│   │   └── printStore.ts       # 正反面选择 + 打印版面（持久化）
 │   ├── features/
 │   │   └── batchExport.ts      # 批量导出编排（并发、命名、ZIP、复制）
 │   ├── hooks/
@@ -166,14 +180,16 @@ watermark-studio/
 │   │   ├── Inspector.tsx        # 样式 / 布局 / 导出 / 方案 四个页签
 │   │   ├── StylePanel.tsx  LayoutPanel.tsx  ExportPanel.tsx  PresetPanel.tsx
 │   │   ├── controls.tsx         # 表单原语（滑杆 / 分段 / 开关 / 取色 / 九宫格）
+│   │   ├── PrintSheet.tsx      # A4 打印面板（预览 + 版面参数 + 打印）
 │   │   ├── StageStates.tsx     # 台面的读取中 / 读取失败两种状态
 │   │   ├── ErrorBoundary.tsx   # 渲染崩溃兜底
 │   │   ├── DropZone.tsx  ToastHost.tsx  ProgressOverlay.tsx  icons.tsx
 │   ├── styles/                  # fonts.css（自托管字体）/ tokens.css（设计变量）
 │   │                            # base.css（外壳与画布）/ panels.css（检查器与控件）
+│   │                            # print.css（打印面板 + @media print 的 A4 纸面）
 │   ├── App.tsx  main.tsx
-├── tests/                       # 41 个单测：断行 / 几何 / 命名 / 变量 / 队列
-│   └── e2e/                     # Playwright 冒烟：导入 → 状态 → 编辑 → 打码 → 导出（43 断言）
+├── tests/                       # 55 个单测：断行 / 几何 / 命名 / 变量 / 队列 / 打印
+│   └── e2e/                     # Playwright 冒烟：导入 → 状态 → 编辑 → 打码 → 打印 → 导出（55 断言）
 ├── public/                      # favicon / manifest / service worker
 ├── docs/PLAN.md                 # 项目规划、功能清单、技术选型与路线图
 ├── .github/workflows/           # CI（类型检查 + 测试 + 构建）与 EdgeOne 部署
@@ -264,9 +280,9 @@ Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'
 ## 测试
 
 ```bash
-npm test          # 41 个单元测试（vitest）
+npm test          # 55 个单元测试（vitest）
 npm run build     # 类型检查 + 生产构建
-npm run test:e2e  # 43 项端到端断言（需本机 Chrome，脚本会自动起 preview）
+npm run test:e2e  # 55 项端到端断言（需本机 Chrome，脚本会自动起 preview）
 ```
 
 | 文件 | 覆盖 |
@@ -276,7 +292,8 @@ npm run test:e2e  # 43 项端到端断言（需本机 Chrome，脚本会自动�
 | `tests/export.test.ts` | MIME 映射（含 GIF/SVG → PNG）、扩展名、命名模板六种占位符、非法字符过滤、回退规则 |
 | `tests/tokens.test.ts` | 日期/时间/文件名/序号替换、大小写不敏感、未知占位符、缺值兜底 |
 | `tests/state.test.ts` | 队列判定：失败项不算就绪、`ready` 但无 bitmap 不算就绪、跳过与失败都不计入待处理 |
-| `tests/e2e/smoke.mjs` | 首张上传后**继续添加**、坏文件留在队列并可重试/移除、骨架瓷砖与读取进度、水印绘制与对比原图、撤销/重做、拖拽定位、方向键微调、三种打码模式的像素级验证、预设、ZIP / 单张导出、深色主题、390px 响应式、零外部请求 |
+| `tests/print.test.ts` | A4 / 证件尺寸、上下与并排落位、间距与缩放、居中对称、越界判定、裁切线数量与不出纸 |
+| `tests/e2e/smoke.mjs` | 首张上传后**继续添加**、坏文件留在队列并可重试/移除、骨架瓷砖与读取进度、水印绘制与对比原图、撤销/重做、拖拽定位、方向键微调、三种打码模式的像素级验证、**A4 打印落位与打印媒体 210×297mm**、预设、ZIP / 单张导出、深色主题、390px 响应式、零外部请求 |
 
 > 打码相关断言不是「截图看着对」：脚本会读取画布像素，计算区域内的高频能量与标准差，验证马赛克把块内细节抹平、模糊降低梯度、纯色把区域方差压到近 0。
 >
@@ -291,6 +308,7 @@ npm run test:e2e  # 43 项端到端断言（需本机 Chrome，脚本会自动�
 - [x] Playwright 端到端用例入库（`npm run test:e2e`）
 - [x] 空 / 加载 / 错误三态（含可取消的读取、失败重试、渲染兜底）
 - [ ] 每张图片独立覆盖水印参数（当前为全局统一）
+- [ ] 打印：自定义纸张（A5 / B5）、多份拼版、泳道式排版
 - [ ] 二维码水印图层
 - [ ] 打码区域的椭圆 / 画笔自由形状
 - [ ] 端到端用例接入 GitHub Actions（Runner 自带 Chrome）

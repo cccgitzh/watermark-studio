@@ -358,7 +358,76 @@ try {
     (await page.locator('.thumb-skeleton').count()) === 0,
   );
 
-  // 11. 主题与响应式
+  // 11. A4 打印排版
+  await page.getByRole('button', { name: '打印', exact: true }).click();
+  await page.waitForSelector('.print-dialog');
+  check('打印面板打开', await page.locator('.print-title').isVisible());
+  check('正反面两个槽位都自动填好', (await page.locator('.print-slot').count()) === 2);
+  const slotNames = await page.locator('.print-slot-name').allInnerTexts();
+  check(
+    '槽位取自队列前两张且互不重复',
+    slotNames[0] !== '未选择' && slotNames[1] !== '未选择' && slotNames[0] !== slotNames[1],
+    slotNames.join(' / '),
+  );
+
+  const readout = () => page.locator('.print-caption-coords').innerText();
+  const columnText = (await readout()).replace(/\n/g, ' ');
+  check(
+    '默认上下排版：反面在正面下方 66 mm',
+    columnText.includes('上 16.0') && columnText.includes('上 82.0'),
+    columnText,
+  );
+
+  await page.getByRole('radio', { name: '并排' }).click();
+  await page.waitForTimeout(400);
+  const rowText = (await readout()).replace(/\n/g, ' ');
+  check('并排后反面右移到 113.6 mm', rowText.includes('左 113.6'), rowText);
+  check('成品尺寸随排列变化', rowText.includes('183.2 × 54.0'), rowText);
+  await page.screenshot({ path: shot('09-print-sheet.png') });
+
+  // 居中 + 校准尺：两张应左右对称
+  await page.getByRole('radio', { name: '居中' }).click();
+  await page.waitForTimeout(400);
+  const centered = await page.evaluate(() => {
+    const canvas = document.querySelector('.print-canvas');
+    if (!canvas) return null;
+    const box = canvas.getBoundingClientRect();
+    return { width: box.width, height: box.height };
+  });
+  check('预览画布保持 A4 比例', centered ? Math.abs(centered.width / centered.height - 210 / 297) < 0.01 : false);
+
+  // 打印媒体：只剩一张 210 × 297 mm 的纸
+  await page.emulateMedia({ media: 'print' });
+  await page.waitForTimeout(300);
+  const printBox = await page.locator('.print-sheet-page').boundingBox();
+  const printPixels = await page
+    .locator('.print-sheet-page')
+    .evaluate((canvas) => ({ width: canvas.width, height: canvas.height }));
+  const appVisibleInPrint = await page.locator('.app').isVisible().catch(() => false);
+  check('打印时主界面隐藏', !appVisibleInPrint);
+  check(
+    '打印页为 210 × 297 mm（96dpi 下 794 × 1123 px）',
+    printBox
+      ? Math.abs(printBox.width - (210 / 25.4) * 96) < 2 &&
+        Math.abs(printBox.height - (297 / 25.4) * 96) < 2
+      : false,
+    printBox ? `${printBox.width.toFixed(1)} × ${printBox.height.toFixed(1)} px` : 'missing',
+  );
+  check(
+    '打印画布已预渲染（非空白）',
+    printPixels.width > 700 && printPixels.height > 900,
+    `${printPixels.width} × ${printPixels.height}`,
+  );
+  await page.screenshot({ path: shot('10-print-media.png') });
+  await page.emulateMedia({ media: 'screen' });
+
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(300);
+  check('Esc 关闭打印面板', (await page.locator('.print-dialog').count()) === 0);
+  const focusBack = await page.evaluate(() => document.activeElement?.textContent?.trim() ?? '');
+  check('关闭后焦点回到「打印」按钮', focusBack === '打印', focusBack);
+
+  // 12. 主题与响应式
   await page.locator('.topbar button[title*="深色"], .topbar button[title*="浅色"]').click();
   await page.waitForTimeout(300);
   check('深色主题切换', (await page.evaluate(() => document.documentElement.dataset.theme)) === 'dark');
@@ -372,7 +441,7 @@ try {
   check('390px 无横向溢出', scrollWidth <= 391, `scrollWidth=${scrollWidth}`);
   await page.screenshot({ path: shot('06-mobile.png') });
 
-  // 12. 隐私与稳定性
+  // 13. 隐私与稳定性
   check('零外部网络请求', external.length === 0, external.slice(0, 3).join(', '));
   check('无未捕获页面异常', pageErrors.length === 0, pageErrors.join(' | '));
   check('无控制台 error', consoleErrors.length === 0, consoleErrors.slice(0, 2).join(' | '));

@@ -22,9 +22,7 @@ export function LayoutPanel({ layer }: { layer: WatermarkLayer | null }) {
     return (
       <>
         <PanelSection title="打码区域">
-          <Hint>
-            打码是按「区域」定位的，不参与单点 / 平铺 / 网格排版。在画布上拖动即可框选，区域列表与打码方式在「样式」页签里调整。
-          </Hint>
+          <Hint>打码按区域定位，不参与排版；区域列表与打码方式在「样式」页签。</Hint>
           <Field label={`当前 ${layer.regions.length} 个区域`}>
             <div className="button-row">
               <button
@@ -70,9 +68,7 @@ export function LayoutPanel({ layer }: { layer: WatermarkLayer | null }) {
           ]}
           onChange={changeMode}
         />
-        {layout.mode === 'single' ? (
-          <Hint>单点模式下可以直接在画布上拖动水印调整位置。</Hint>
-        ) : null}
+
       </PanelSection>
 
       {layout.mode === 'single' ? (

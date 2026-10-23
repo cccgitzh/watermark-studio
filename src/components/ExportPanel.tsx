@@ -165,7 +165,7 @@ export function ExportPanel() {
             复制当前到剪贴板
           </button>
         </ButtonRow>
-        <Hint>处理在浏览器本地完成，不产生任何网络请求。</Hint>
+        <Hint>本地处理，不产生网络请求。</Hint>
       </PanelSection>
     </>
   );

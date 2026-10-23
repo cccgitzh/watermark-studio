@@ -14,6 +14,15 @@ const base = ({ size = 16, ...props }: IconProps) => ({
   ...props,
 });
 
+export const IconPrint = (props: IconProps) => (
+  <svg {...base(props)}>
+    <path d="M6.5 9V4.5h11V9" />
+    <rect x="3.5" y="9" width="17" height="7.5" rx="1.6" />
+    <path d="M6.5 13.5h11v6h-11z" />
+    <path d="M17 11.6h.01" strokeWidth={2.2} />
+  </svg>
+);
+
 export const IconRotate = (props: IconProps) => (
   <svg {...base(props)}>
     <path d="M4 10a8 8 0 1 1 2.2 7.4" />

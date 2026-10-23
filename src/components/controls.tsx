@@ -172,10 +172,10 @@ export function Toggle({
       className={checked ? 'switch is-on' : 'switch'}
       onClick={() => onChange(!checked)}
     >
+      <span className="switch-label">{label}</span>
       <span className="switch-track" aria-hidden>
         <span className="switch-thumb" />
       </span>
-      <span className="switch-label">{label}</span>
     </button>
   );
 }

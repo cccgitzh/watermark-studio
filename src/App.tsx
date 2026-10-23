@@ -4,6 +4,7 @@ import { useEditor } from './state/editorStore';
 import { Inspector } from './components/Inspector';
 import { LayersPanel } from './components/LayersPanel';
 import { PreviewStage } from './components/PreviewStage';
+import { PrintSheet } from './components/PrintSheet';
 import { ProgressOverlay } from './components/ProgressOverlay';
 import { SheetHead } from './components/SheetHead';
 import { ToastHost } from './components/ToastHost';
@@ -83,6 +84,7 @@ export default function App() {
           </div>
         </div>
       ) : null}
+      <PrintSheet />
       <ToastHost />
       <ProgressOverlay />
     </div>
